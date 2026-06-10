@@ -138,7 +138,7 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 <meta charset=&quot;UTF-8&quot;>
 <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
 <title>PDV Quality — Relatório Semanal</title>
-<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap&quot; rel=&quot;stylesheet&quot;>
+<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600&amp;family=DM+Mono:wght@400;500&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
 <style>
 :root {
   --navy: #0D1B2A;
@@ -1095,63 +1095,53 @@ function salvar() {
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js&quot;></script>
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js&quot;></script>
 <script>
-
-const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};
-if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-const db=firebase.firestore();
-
+const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);const db=firebase.firestore();
 const dashRef=db.collection('painel').doc('relatorio');
-let _saving=false,_timer=null;
-function fbSave(){
-  clearTimeout(_timer);
-  _timer=setTimeout(()=>{
+let _dashTimer=null,_fromFbD=false;
+function fbSaveDash(){
+  clearTimeout(_dashTimer);
+  _dashTimer=setTimeout(()=>{
+    if(_fromFbD)return;
     const data={};
     ['f1','f2','f3','f4','f5','cLinkedIn','cWhats','cLigacao','sAlim','sBeb','sHig','sOut'].forEach(id=>{
       const el=document.getElementById(id);if(el)data[id]=el.value;
     });
     data.statusIdx=statusIdx;
-    data.weekDate=document.getElementById('weekDate').value;
-    // pipeline
+    data.weekDate=document.getElementById('weekDate')?document.getElementById('weekDate').value:'';
     const rows=[];
     document.querySelectorAll('#pipelineBody tr').forEach(tr=>{
-      const cells=tr.querySelectorAll('input,select');
-      rows.push({empresa:cells[0]?.value||'',contato:cells[1]?.value||'',cargo:cells[2]?.value||'',data:cells[3]?.value||'',acao:cells[4]?.value||'',status:cells[5]?.value||''});
+      const c=tr.querySelectorAll('input,select');
+      if(c.length>=6)rows.push({empresa:c[0].value,contato:c[1].value,cargo:c[2].value,data:c[3].value,acao:c[4].value,status:c[5].value});
     });
     data.pipeline=rows;
-    // notas
     const dest=[],obst=[];
-    document.querySelectorAll('#destaquesContainer .nota-text').forEach(i=>dest.push(i.value||''));
-    document.querySelectorAll('#obstaculosContainer .nota-text').forEach(i=>obst.push(i.value||''));
+    document.querySelectorAll('#destaquesContainer input').forEach(i=>dest.push(i.value));
+    document.querySelectorAll('#obstaculosContainer input').forEach(i=>obst.push(i.value));
     data.destaques=dest;data.obstaculos=obst;
     dashRef.set(data);
   },800);
 }
-function fbLoad(data){
+dashRef.onSnapshot(snap=>{
+  if(!snap.exists)return;
+  _fromFbD=true;
+  const d=snap.data();
   ['f1','f2','f3','f4','f5','cLinkedIn','cWhats','cLigacao','sAlim','sBeb','sHig','sOut'].forEach(id=>{
-    const el=document.getElementById(id);if(el&&data[id]!==undefined)el.value=data[id];
+    const el=document.getElementById(id);if(el&amp;&amp;d[id]!==undefined)el.value=d[id];
   });
-  if(data.weekDate)document.getElementById('weekDate').value=data.weekDate;
-  if(data.statusIdx!==undefined){statusIdx=(data.statusIdx-1+3)%3;cycleStatus();}
-  // pipeline
-  if(data.pipeline&&data.pipeline.length){
+  if(d.weekDate&amp;&amp;document.getElementById('weekDate'))document.getElementById('weekDate').value=d.weekDate;
+  if(d.statusIdx!==undefined){statusIdx=(d.statusIdx+3-1)%3;cycleStatus();}
+  if(d.pipeline&amp;&amp;d.pipeline.length){
     document.getElementById('pipelineBody').innerHTML='';
-    data.pipeline.forEach(r=>addPipelineRow(r));
+    d.pipeline.forEach(r=>addPipelineRow(r));
   }
-  // notas
-  if(data.destaques){document.getElementById('destaquesContainer').innerHTML='';data.destaques.forEach(t=>{addNota('destaques','#1A7A4A');const ins=document.querySelectorAll('#destaquesContainer .nota-text');ins[ins.length-1].value=t;});}
-  if(data.obstaculos){document.getElementById('obstaculosContainer').innerHTML='';data.obstaculos.forEach(t=>{addNota('obstaculos','#B45309');const ins=document.querySelectorAll('#obstaculosContainer .nota-text');ins[ins.length-1].value=t;});}
-  calcFunil();calcCanais();calcSetores();updateWeekLabel();
-}
-dashRef.onSnapshot(snap=>{if(snap.exists)fbLoad(snap.data());});
-document.addEventListener('input',fbSave);
-document.addEventListener('change',fbSave);
+  if(d.destaques){document.getElementById('destaquesContainer').innerHTML='';d.destaques.forEach(t=>{addNota('destaques','#1A7A4A');const ins=document.querySelectorAll('#destaquesContainer input');if(ins.length)ins[ins.length-1].value=t;});}
+  if(d.obstaculos){document.getElementById('obstaculosContainer').innerHTML='';d.obstaculos.forEach(t=>{addNota('obstaculos','#B45309');const ins=document.querySelectorAll('#obstaculosContainer input');if(ins.length)ins[ins.length-1].value=t;});}
+  calcFunil();calcCanais();calcSetores();
+  _fromFbD=false;
+});
+document.addEventListener('input',fbSaveDash);
+document.addEventListener('change',fbSaveDash);
 </script>
-
-<style>
-#fb-sync{position:fixed;bottom:8px;right:12px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:99px;z-index:9999;background:rgba(26,122,74,.15);color:#1A7A4A;border:1px solid #A7F3D0;opacity:0;transition:opacity .5s}
-#fb-sync.show{opacity:1}
-</style>
-<div id="fb-sync">● sincronizado</div>
 </body>
 </html>
 " frameborder="0" allowfullscreen></iframe></div>
@@ -1161,7 +1151,7 @@ document.addEventListener('change',fbSave);
 <meta charset=&quot;UTF-8&quot;>
 <meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1.0&quot;>
 <title>PDV Quality — Validação de Contatos</title>
-<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap&quot; rel=&quot;stylesheet&quot;>
+<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600;700&amp;family=DM+Mono:wght@400;500&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1302,7 +1292,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 
 <div class=&quot;bottom-bar&quot;>
-  <div class=&quot;bs&quot;>Confirmados: <strong id=&quot;bV&quot;>0</strong> &nbsp;·&nbsp; Investigar: <strong id=&quot;bA&quot;>0</strong> &nbsp;·&nbsp; Descartados: <strong id=&quot;bS&quot;>0</strong></div>
+  <div class=&quot;bs&quot;>Confirmados: <strong id=&quot;bV&quot;>0</strong> &amp;nbsp;·&amp;nbsp; Investigar: <strong id=&quot;bA&quot;>0</strong> &amp;nbsp;·&amp;nbsp; Descartados: <strong id=&quot;bS&quot;>0</strong></div>
   <div class=&quot;bbtns&quot;>
     <button class=&quot;btn-t&quot; onclick=&quot;resetarTodos()&quot;>↺ Resetar tudo</button>
     <button class=&quot;btn-export&quot; onclick=&quot;exportarCSV()&quot;>⬇ Exportar confirmados</button>
@@ -1357,7 +1347,7 @@ const C=[
   {m:'McCAIN',nm:'Eduardo (sobrenome a confirmar)',cg:'Trade / Comercial',em:'McCain Foods ou atual',pr:'2019–2023',ht:'PDV Quality (op.)',lk:'https://www.linkedin.com/search/results/people/?keywords=Eduardo%20McCain%20Foods%20trade',tp:'busca'},
   {m:'McCAIN',nm:'Priscila (sobrenome a confirmar)',cg:'Trade / Comercial',em:'McCain Foods ou atual',pr:'2019–2023',ht:'PDV Quality (op.)',lk:'https://www.linkedin.com/search/results/people/?keywords=Priscila%20McCain%20Foods%20trade',tp:'busca'},
   {m:'MELITTA',nm:'Michael Nunes',cg:'Coord. Nacional Trade Marketing e Merchandising',em:'Melitta Brasil',pr:'2019–atual',ht:'Ferrero / Claro',lk:'https://www.linkedin.com/search/results/people/?keywords=Michael%20Nunes%20Melitta%20trade',tp:'busca',pc:true},
-  {m:'MELITTA',nm:'João Michaliszyn',cg:'Trade Marketing Head & Manager',em:'Melitta South America',pr:'2019–atual',ht:'Melitta do Brasil',lk:'https://www.linkedin.com/search/results/people/?keywords=Joao%20Michaliszyn%20Melitta',tp:'busca',pc:true},
+  {m:'MELITTA',nm:'João Michaliszyn',cg:'Trade Marketing Head &amp; Manager',em:'Melitta South America',pr:'2019–atual',ht:'Melitta do Brasil',lk:'https://www.linkedin.com/search/results/people/?keywords=Joao%20Michaliszyn%20Melitta',tp:'busca',pc:true},
   {m:'SOFTYS',nm:'Taís Praia',cg:'Trade / Comercial / Marketing',em:'Softys Brasil ou atual',pr:'2019–2023',ht:'PDV Quality (op.)',lk:'https://www.linkedin.com/search/results/people/?keywords=Tais%20Softys%20trade%20marketing%20Brasil',tp:'busca'},
   {m:'SOFTYS',nm:'Isabel (sobrenome a confirmar)',cg:'Trade / Comercial',em:'Softys Brasil ou atual',pr:'2019–2023',ht:'PDV Quality (op.)',lk:'https://www.linkedin.com/search/results/people/?keywords=Isabel%20Softys%20Brasil%20trade',tp:'busca'},
   {m:'SOFTYS',nm:'Guilherme (sobrenome a confirmar)',cg:'Trade / Comercial',em:'Softys Brasil ou atual',pr:'2019–2023',ht:'PDV Quality (op.)',lk:'https://www.linkedin.com/search/results/people/?keywords=Guilherme%20Softys%20Brasil%20trade',tp:'busca'},
@@ -1468,42 +1458,6 @@ function exportarCSV(){
 
 carregar(); render();
 </script>
-<script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js&quot;></script>
-<script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js&quot;></script>
-<script>
-
-const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};
-if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-const db=firebase.firestore();
-
-const contRef=db.collection('painel').doc('contatos');
-function fbSaveCont(){
-  const s={};
-  document.querySelectorAll('[data-cid]').forEach(el=>{
-    const id=el.dataset.cid;
-    s['v_'+id]=el.dataset.val||'';
-  });
-  document.querySelectorAll('.nota-in[data-cid]').forEach(el=>{
-    s['n_'+el.dataset.cid]=el.value||'';
-  });
-  contRef.set(s);
-}
-contRef.onSnapshot(snap=>{
-  if(!snap.exists)return;
-  const d=snap.data();
-  Object.entries(d).forEach(([k,v])=>{
-    if(k.startsWith('v_')){
-      const id=k.slice(2);
-      const el=document.querySelector('[data-cid=&quot;'+id+'&quot;]');
-      if(el&&v){el.dataset.val=v;applyState(el,v);}
-    } else if(k.startsWith('n_')){
-      const id=k.slice(2);
-      const el=document.querySelector('.nota-in[data-cid=&quot;'+id+'&quot;]');
-      if(el)el.value=v;
-    }
-  });
-});
-</script>
 </body>
 </html>
 " frameborder="0" allowfullscreen></iframe></div>
@@ -1513,7 +1467,7 @@ contRef.onSnapshot(snap=>{
 <meta charset=&quot;UTF-8&quot;>
 <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
 <title>PDV Quality — Calculadora de Decupagem</title>
-<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap&quot; rel=&quot;stylesheet&quot;>
+<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600;700&amp;family=DM+Mono:wght@400;500&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2132,31 +2086,31 @@ setRegime('s');
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js&quot;></script>
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js&quot;></script>
 <script>
-
-const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};
-if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-const db=firebase.firestore();
-
+const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);const db=firebase.firestore();
 const calcRef=db.collection('painel').doc('decupagem');
-let _calcTimer=null;
+let _calcTimer=null,_fromFbC=false;
 function fbSaveCalc(){
   clearTimeout(_calcTimer);
   _calcTimer=setTimeout(()=>{
+    if(_fromFbC)return;
     const data={regime:regime};
-    document.querySelectorAll('input[id^=&quot;v_&quot;],#inPromo,#inValor').forEach(el=>{data[el.id]=el.value;});
+    document.querySelectorAll('input[id^=&quot;v_&quot;]').forEach(el=>{data[el.id]=el.value;});
+    const pi=document.getElementById('inPromo'),vi=document.getElementById('inValor');
+    if(pi)data.inPromo=pi.value;if(vi)data.inValor=vi.value;
     calcRef.set(data);
   },600);
 }
 calcRef.onSnapshot(snap=>{
   if(!snap.exists)return;
+  _fromFbC=true;
   const d=snap.data();
   if(d.regime)setRegime(d.regime);
   Object.entries(d).forEach(([k,v])=>{
     if(k==='regime')return;
-    const el=document.getElementById(k);
-    if(el)el.value=v;
+    const el=document.getElementById(k);if(el)el.value=v;
   });
   calc();
+  _fromFbC=false;
 });
 document.addEventListener('input',fbSaveCalc);
 document.addEventListener('change',fbSaveCalc);
@@ -2171,7 +2125,7 @@ document.addEventListener('change',fbSaveCalc);
 <meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1.0&quot;>
 <title>PDV Quality — Gerador de Proposta</title>
 <script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js&quot;></script>
-<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap&quot; rel=&quot;stylesheet&quot;>
+<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600;700&amp;family=DM+Mono:wght@400;500&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2532,18 +2486,18 @@ function parseRows(rows, tipo, fname) {
     if(tipo==='e') {
       // Col B=PROMOTOR(1), C=CNPJ(2), D=END(3), E=NUM(4), F=BAIRRO(5), G=CIDADE(6), H=CEP(7), I=UF(8), J=REDE(9), K=LOJA(10), M-R=dias
       let pr,cn,en,nu,ba,ci,ce,uf,re,lo,dias=[];
-      if(v.length>=11 && (v[0].toUpperCase().includes('PROMOTOR')||v[1]?.toUpperCase().includes('PROMOTOR'))){
+      if(v.length>=11 &amp;&amp; (v[0].toUpperCase().includes('PROMOTOR')||v[1]?.toUpperCase().includes('PROMOTOR'))){
         const off = v[0]===''?1:0;
         pr=v[off+0];cn=v[off+1];en=v[off+2];nu=v[off+3];ba=v[off+4];ci=v[off+5];ce=v[off+6];uf=v[off+7];re=v[off+8];lo=v[off+9];
         // dias: cols M(11),N(12),O(13),P(14),Q(15),R(16) — offset
         const dNames=['SEG','TER','QUA','QUI','SEX','SAB'];
-        for(let i=0;i<6;i++){if(v[off+10+i]&&v[off+10+i]!=='')dias.push(dNames[i]);}
+        for(let i=0;i<6;i++){if(v[off+10+i]&amp;&amp;v[off+10+i]!=='')dias.push(dNames[i]);}
       } else {
         // Formato manual: Promotor|CNPJ|End|Nº|Bairro|Cidade|CEP|UF|Rede|Loja|dias
         [pr,cn,en,nu,ba,ci,ce,uf,re,lo]=v;
         if(v[10]) dias=v[10].split(',').map(x=>x.trim().toUpperCase());
       }
-      if(lo && !lo.toUpperCase().includes('LOJA') && !lo.toUpperCase().includes('PROMOTOR'))
+      if(lo &amp;&amp; !lo.toUpperCase().includes('LOJA') &amp;&amp; !lo.toUpperCase().includes('PROMOTOR'))
         data.push({promotor:pr||'',cnpj:cn||'',endereco:en||'',numero:nu||'',bairro:ba||'',cidade:ci||'',cep:ce||'',uf:uf||'',rede:re||'',loja:lo||'',dias});
     } else {
       // Compartilhado: B=CNPJ(0), C=REDE(1), D=LOJA(2), E=UF(3), F=END(4), G=NUM(5), H=BAIRRO(6), I=CIDADE(7), J=CEP(8), K=FREQ(9), M=HRS(11), O=CUSTO(13)
@@ -2554,7 +2508,7 @@ function parseRows(rows, tipo, fname) {
       } else {
         [cn,re,lo,uf,ci,fr,hr,cu]=v;
       }
-      if(lo && !lo.toUpperCase().includes('LOJA') && !lo.toUpperCase().includes('REDE'))
+      if(lo &amp;&amp; !lo.toUpperCase().includes('LOJA') &amp;&amp; !lo.toUpperCase().includes('REDE'))
         data.push({cnpj:cn||'',rede:re||'',loja:lo||'',uf:uf||'',endereco:en||'',numero:nu||'',bairro:ba||'',cidade:ci||'',cep:ce||'',freq:fr||'5',horas_exe:hr||'1',custo_hora:parseFloat(cu)||31.88});
     }
   });
@@ -2575,14 +2529,14 @@ function parseRows(rows, tipo, fname) {
 
 function parseManual() {
   const rE = document.getElementById('f_re').value.trim();
-  if(rE && lE.length===0) {
+  if(rE &amp;&amp; lE.length===0) {
     lE = rE.split('\n').filter(l=>l.trim()).map(l=>{
       const p=l.split('|').map(x=>x.trim());
       return{promotor:p[0]||'',cnpj:p[1]||'',endereco:p[2]||'',numero:p[3]||'',bairro:p[4]||'',cidade:p[5]||'',cep:p[6]||'',uf:p[7]||'',rede:p[8]||'',loja:p[9]||'',dias:(p[10]||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean)};
     });
   }
   const rC = document.getElementById('f_rc').value.trim();
-  if(rC && lC.length===0) {
+  if(rC &amp;&amp; lC.length===0) {
     lC = rC.split('\n').filter(l=>l.trim()).map(l=>{
       const p=l.split('|').map(x=>x.trim());
       return{cnpj:p[0]||'',rede:p[1]||'',loja:p[2]||'',uf:p[3]||'',cidade:p[4]||'',freq:p[5]||'5',horas_exe:p[6]||'1',custo_hora:parseFloat(p[7])||31.88};
@@ -2858,7 +2812,7 @@ function downloadExcelFallback(){
   XLSX.utils.book_append_sheet(wb,wsR,'Resumo');
 
   // ─ EXCLUSIVO — estrutura fiel ao original ─
-  if(d.lojasExcl&&d.lojasExcl.length>0){
+  if(d.lojasExcl&amp;&amp;d.lojasExcl.length>0){
     const rows_e=[
       [],[],[],[],[],[],[],[],  // linhas 1-8 em branco
       ['','PROMOTOR','CNPJ','ENDEREÇO','NUMERO','BAIRRO','CIDADE','CEP','UF ','REDE','LOJA',
@@ -2891,7 +2845,7 @@ function downloadExcelFallback(){
   }
 
   // ─ COMPARTILHADO — estrutura fiel ao original ─
-  if(d.lojasComp&&d.lojasComp.length>0){
+  if(d.lojasComp&amp;&amp;d.lojasComp.length>0){
     const rows_c=[
       [],[],[],[],[],[],  // linhas 1-6 em branco
       ['','CNPJ','REDE','LOJA','UF ','ENDEREÇO','NUMERO','BAIRRO','CIDADE','CEP',
@@ -2930,16 +2884,13 @@ addEstado();
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js&quot;></script>
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js&quot;></script>
 <script>
-
-const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};
-if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-const db=firebase.firestore();
-
+const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);const db=firebase.firestore();
 const propRef=db.collection('painel').doc('proposta');
-let _propTimer=null;
+let _propTimer=null,_fromFbP=false;
 function fbSaveProp(){
   clearTimeout(_propTimer);
   _propTimer=setTimeout(()=>{
+    if(_fromFbP)return;
     const data={};
     ['f_marca','f_slogan','f_resp','f_tel','f_c1t','f_c2t','f_pdv','f_num','f_obs','f_re','f_rc'].forEach(id=>{
       const el=document.getElementById(id);if(el)data[id]=el.value;
@@ -2949,11 +2900,13 @@ function fbSaveProp(){
 }
 propRef.onSnapshot(snap=>{
   if(!snap.exists)return;
+  _fromFbP=true;
   const d=snap.data();
   Object.entries(d).forEach(([k,v])=>{
     const el=document.getElementById(k);
     if(el){el.value=v;if(k==='f_c1t')document.getElementById('f_c1').value=v;if(k==='f_c2t')document.getElementById('f_c2').value=v;}
   });
+  _fromFbP=false;
 });
 document.addEventListener('input',fbSaveProp);
 document.addEventListener('change',fbSaveProp);
@@ -2967,7 +2920,7 @@ document.addEventListener('change',fbSaveProp);
 <meta charset=&quot;UTF-8&quot;>
 <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
 <title>PDV Quality — Checklist de Lançamento</title>
-<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap&quot; rel=&quot;stylesheet&quot;>
+<link href=&quot;https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -3354,7 +3307,7 @@ function updateAll() {
   let pendBlockers = 0;
   CATS.forEach((cat, ci) => {
     cat.items.forEach((item, ii) => {
-      if (item.blocker && !state[`${ci}-${ii}`]) pendBlockers++;
+      if (item.blocker &amp;&amp; !state[`${ci}-${ii}`]) pendBlockers++;
     });
   });
   document.getElementById('blockerCount').textContent = pendBlockers;
@@ -3377,22 +3330,22 @@ updateAll();
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js&quot;></script>
 <script src=&quot;https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js&quot;></script>
 <script>
-
-const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};
-if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-const db=firebase.firestore();
-
+const FB_CONFIG={apiKey:&quot;AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q&quot;,authDomain:&quot;painel-pdv-quality.firebaseapp.com&quot;,projectId:&quot;painel-pdv-quality&quot;,storageBucket:&quot;painel-pdv-quality.firebasestorage.app&quot;,messagingSenderId:&quot;1075785754630&quot;,appId:&quot;1:1075785754630:web:e7301ed75ff44da800bb87&quot;};if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);const db=firebase.firestore();
 const chkRef=db.collection('painel').doc('checklist');
-let _fbLoaded=false;
-chkRef.onSnapshot(snap=>{
-  if(snap.exists){const d=snap.data();if(d&&d.state){state=d.state;updateAll();}}
-  _fbLoaded=true;
-});
-const _origClick=el=>{
-  state[el._key]=!state[el._key];
-  chkRef.set({state:state},{merge:false});
-  updateAll();
+// Override updateAll to also save to Firebase
+const _origUpdateAll=updateAll;
+let _fromFb=false;
+updateAll=function(){
+  _origUpdateAll();
+  if(!_fromFb) chkRef.set({state:state});
 };
+// Real-time listener
+chkRef.onSnapshot(snap=>{
+  if(snap.exists){
+    const d=snap.data();
+    if(d&amp;&amp;d.state){state=d.state;_fromFb=true;updateAll();_fromFb=false;}
+  }
+});
 </script>
 </body>
 </html>
