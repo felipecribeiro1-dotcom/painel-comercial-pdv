@@ -54,6 +54,8 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 .mi-v{font-family:'DM Serif Display',serif;font-size:20px;color:white}
 .mi-s{font-size:10px;color:rgba(255,255,255,.25);margin-top:1px}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -70,6 +72,7 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 <button class="tab" id="t-cont" onclick="show('cont')" style="--c:#1A7A4A">Contatos</button>
 <button class="tab" id="t-calc" onclick="show('calc')" style="--c:#B45309">Decupagem</button>
 <button class="tab" id="t-prop" onclick="show('prop')" style="--c:#7C3AED">Proposta</button>
+<button class="tab" id="t-plan" onclick="show('plan')" style="--c:#EA580C">Planejamento</button>
 <button class="tab" id="t-chk" onclick="show('chk')" style="--c:#DC2626">Checklist</button>
   </nav>
 </div>
@@ -106,6 +109,10 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
           <div class="card-ico">📄</div><div class="card-t">Gerador de Proposta</div>
           <div class="card-d">Proposta completa com identidade da marca, múltiplos estados e roteiro.</div>
           <div class="card-tag" style="background:#F3E8FF;color:#7C3AED">CrossTrade · Exclusivo · Compartilhado</div>
+        </div>
+        <div class="card" onclick="show('plan')">
+          <div class="card-ico">📅</div><div class="card-t">Planejamento</div>
+          <div class="card-d">Tarefas da semana com checklist interativo.</div>
         </div>
         <div class="card" onclick="show('chk')">
           <div class="card-stripe" style="background:linear-gradient(90deg,#DC2626,#F87171)"></div>
@@ -1092,6 +1099,215 @@ function salvar() {
   }, 2000);
 }
 </script>
+
+<script>
+// ── FIREBASE SYNC ──
+const firebaseConfig = {
+  apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+  authDomain: "painel-pdv-quality.firebaseapp.com",
+  projectId: "painel-pdv-quality",
+  storageBucket: "painel-pdv-quality.firebasestorage.app",
+  messagingSenderId: "1075785754630",
+  appId: "1:1075785754630:web:e7301ed75ff44da800bb87"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_DASH = 'painel_comercial/dashboard';
+const DOC_CONT = 'painel_comercial/contatos';
+const DOC_CHK  = 'painel_comercial/checklist';
+
+function syncStatus(msg, cor) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-txt');
+  if (dot) dot.style.background = cor;
+  if (txt) txt.textContent = msg;
+}
+
+// ── SALVAR NO FIRESTORE ──
+async function fbSalvar(docPath, data) {
+  try {
+    await db.doc(docPath).set(data, { merge: true });
+    syncStatus('Salvo ✓', '#4ADE80');
+    setTimeout(() => syncStatus('Sincronizado', '#4ADE80'), 2000);
+  } catch(e) {
+    console.error('Firebase save error:', e);
+    syncStatus('Erro ao salvar', '#F87171');
+  }
+}
+
+// ── CARREGAR DO FIRESTORE ──
+async function fbCarregar(docPath) {
+  try {
+    const snap = await db.doc(docPath).get();
+    return snap.exists ? snap.data() : null;
+  } catch(e) {
+    console.error('Firebase load error:', e);
+    return null;
+  }
+}
+
+// ── LISTENER REALTIME ──
+function fbListen(docPath, callback) {
+  return db.doc(docPath).onSnapshot(snap => {
+    if (snap.exists) callback(snap.data());
+  }, err => {
+    console.error('Firebase listen error:', err);
+    syncStatus('Offline', '#F87171');
+  });
+}
+
+// ── OVERRIDE: salvar contatos no Firestore em vez de localStorage ──
+// Interceptar a função salvar() original dos contatos
+window._fbReady = false;
+
+async function fbInit() {
+  try {
+    syncStatus('Conectando...', '#FCD34D');
+
+    // Carregar contatos
+    const contData = await fbCarregar(DOC_CONT);
+    if (contData && contData.status) {
+      // Aplicar status ao array C da aba de contatos
+      try {
+        contData.status.forEach(s => {
+          if (typeof C !== 'undefined' && C[s.id]) {
+            C[s.id].st = s.st;
+            C[s.id].nt = s.nt || '';
+          }
+        });
+        if (typeof render === 'function') render();
+      } catch(e) {}
+    }
+
+    // Carregar dashboard
+    const dashData = await fbCarregar(DOC_DASH);
+    if (dashData) {
+      // Aplicar campos do dashboard
+      Object.keys(dashData).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.tagName !== 'BUTTON') {
+          if (el.tagName === 'SELECT') el.value = dashData[id];
+          else if (el.type === 'checkbox') el.checked = dashData[id];
+          else el.value = dashData[id];
+        }
+      });
+      // Recalcular se houver funções de calc
+      ['calcFunil','calcCanais','calcSetores','dash_calcFunil','dash_calcCanais'].forEach(fn => {
+        if (typeof window[fn] === 'function') window[fn]();
+      });
+    }
+
+    // Carregar checklist
+    const chkData = await fbCarregar(DOC_CHK);
+    if (chkData && chkData.itens) {
+      try {
+        chkData.itens.forEach(item => {
+          const el = document.getElementById(item.id);
+          if (el && el.type === 'checkbox') el.checked = item.checked;
+        });
+        ['updateAll','chk_updateAll'].forEach(fn => {
+          if (typeof window[fn] === 'function') window[fn]();
+        });
+      } catch(e) {}
+    }
+
+    syncStatus('Sincronizado ✓', '#4ADE80');
+    window._fbReady = true;
+
+    // Listeners realtime
+    fbListen(DOC_CONT, data => {
+      if (!window._fbReady) return;
+      if (data.status && typeof C !== 'undefined') {
+        data.status.forEach(s => { if(C[s.id]){ C[s.id].st=s.st; C[s.id].nt=s.nt||''; } });
+        if (typeof render === 'function') render();
+      }
+    });
+
+    fbListen(DOC_DASH, data => {
+      if (!window._fbReady || document.activeElement?.closest('#tab-dash')) return;
+      Object.keys(data).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el !== document.activeElement) {
+          if (el.tagName === 'SELECT') el.value = data[id];
+          else if (el.type !== 'checkbox') el.value = data[id];
+        }
+      });
+    });
+
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    syncStatus('Offline — dados locais', '#F87171');
+  }
+}
+
+// Interceptar salvamentos existentes para também salvar no Firebase
+(function() {
+  // Salvar contatos: interceptar função salvar() dos contatos
+  const _origSalvar = window.cont_salvar || window.salvar;
+  
+  // Override: quando contatos salvam no localStorage, também salva no Firebase
+  const origLS = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(key, value) {
+    origLS(key, value);
+    if (key === 'pdvq_v2' && window._fbReady) {
+      try {
+        const parsed = JSON.parse(value);
+        fbSalvar(DOC_CONT, { status: parsed, updated: new Date().toISOString() });
+      } catch(e) {}
+    }
+  };
+
+  // Interceptar mudanças no dashboard: salvar quando campos mudam
+  document.addEventListener('input', function(e) {
+    if (!window._fbReady) return;
+    const el = e.target;
+    const pane = el.closest('#page-dash');
+    if (pane && el.id) {
+      clearTimeout(window._dashSaveTimer);
+      window._dashSaveTimer = setTimeout(() => {
+        const dashEls = document.querySelectorAll('#page-dash [id]');
+        const data = {};
+        dashEls.forEach(el => {
+          if (el.id && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) {
+            data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+          }
+        });
+        fbSalvar(DOC_DASH, { ...data, updated: new Date().toISOString() });
+        syncStatus('Salvando...', '#FCD34D');
+      }, 1500);
+    }
+    // Checklist
+    const chkPane = el.closest('#page-chk');
+    if (chkPane) {
+      clearTimeout(window._chkSaveTimer);
+      window._chkSaveTimer = setTimeout(() => {
+        const checkboxes = document.querySelectorAll('#page-chk input[type=checkbox]');
+        const itens = Array.from(checkboxes).map(cb => ({ id: cb.id, checked: cb.checked })).filter(i => i.id);
+        fbSalvar(DOC_CHK, { itens, updated: new Date().toISOString() });
+        syncStatus('Salvando...', '#FCD34D');
+      }, 800);
+    }
+  });
+
+  // Interceptar clicks em checkboxes do checklist
+  document.addEventListener('change', function(e) {
+    if (!window._fbReady) return;
+    if (e.target.closest('#page-chk')) {
+      clearTimeout(window._chkSaveTimer);
+      window._chkSaveTimer = setTimeout(() => {
+        const checkboxes = document.querySelectorAll('#page-chk input[type=checkbox]');
+        const itens = Array.from(checkboxes).map(cb => ({ id: cb.id, checked: cb.checked })).filter(i => i.id);
+        fbSalvar(DOC_CHK, { itens, updated: new Date().toISOString() });
+      }, 500);
+    }
+  });
+})();
+
+// Iniciar Firebase após página carregar
+window.addEventListener('load', () => setTimeout(fbInit, 500));
+</script>
+
 </body>
 </html>
 " frameborder="0" allowfullscreen></iframe></div>
@@ -3219,7 +3435,161 @@ updateAll();
 </html>
 " frameborder="0" allowfullscreen></iframe></div>
 
+
+<div class="page" id="p-plan" style="padding:1.5rem;overflow-y:auto">
+
+<style>
+.plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.plan-title{font-size:1.3rem;font-weight:700;color:#1a1a1a}
+.plan-semana{font-size:.85rem;color:#888;margin-top:2px}
+.plan-progress{display:flex;align-items:center;gap:.75rem}
+.plan-bar-wrap{width:160px;height:8px;background:#eee;border-radius:99px;overflow:hidden}
+.plan-bar{height:100%;background:#EA580C;border-radius:99px;transition:width .4s}
+.plan-pct{font-size:.85rem;font-weight:600;color:#EA580C;min-width:36px;text-align:right}
+.plan-day{margin-bottom:1.25rem}
+.plan-day-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+.plan-day-dot{width:10px;height:10px;border-radius:50%;background:#EA580C;flex-shrink:0}
+.plan-day-name{font-weight:700;font-size:.95rem;color:#1a1a1a}
+.plan-day-date{font-size:.8rem;color:#888}
+.plan-tasks{display:flex;flex-direction:column;gap:.4rem;padding-left:1.35rem}
+.plan-task{display:flex;align-items:flex-start;gap:.65rem;padding:.55rem .75rem;border-radius:8px;background:#fafafa;border:1px solid #eee;cursor:pointer;transition:background .15s}
+.plan-task:hover{background:#fff3ec}
+.plan-task.done{background:#f0fdf4;border-color:#bbf7d0}
+.plan-task.done .plan-task-text{text-decoration:line-through;color:#aaa}
+.plan-cb{width:20px;height:20px;border-radius:5px;border:2px solid #ddd;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .2s}
+.plan-task.done .plan-cb{background:#22c55e;border-color:#22c55e}
+.plan-cb-check{display:none;color:#fff;font-size:12px;font-weight:700}
+.plan-task.done .plan-cb-check{display:block}
+.plan-task-text{font-size:.875rem;color:#333;line-height:1.45}
+.plan-badge{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
+.b-hot{background:#fee2e2;color:#991b1b}
+.b-new{background:#dcfce7;color:#166534}
+.b-conf{background:#dbeafe;color:#1e40af}
+.plan-tipo{font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;margin-right:2px;flex-shrink:0;margin-top:2px}
+.tp-prop{background:#fff7ed;color:#c2410c}
+.tp-reun{background:#eff6ff;color:#1d4ed8}
+.tp-pros{background:#f0fdf4;color:#15803d}
+.tp-prod{background:#faf5ff;color:#7e22ce}
+.tp-vis{background:#f5f5f4;color:#57534e}
+</style>
+
+<div class="plan-header">
+  <div>
+    <div class="plan-title">Planejamento Comercial</div>
+    <div class="plan-semana">Semana de 15 a 20 de junho de 2025</div>
+  </div>
+  <div class="plan-progress">
+    <div class="plan-bar-wrap"><div class="plan-bar" id="planBar" style="width:0%"></div></div>
+    <div class="plan-pct" id="planPct">0%</div>
+  </div>
 </div>
+
+<div id="planDays"></div>
+
+<script>
+const PLAN_TASKS = [
+  { dia:"Segunda-feira", data:"15 jun", tasks:[
+    { id:"p01", tipo:"prod",  text:"Finalizar deck — inserir slides de Onboarding e Clientes", badge:"new" },
+    { id:"p02", tipo:"pros",  text:"Follow-up nos 10 contatos LinkedIn enviados esta semana" },
+    { id:"p03", tipo:"prop",  text:"Estruturar proposta comercial Limpano", badge:"hot" },
+    { id:"p04", tipo:"pros",  text:"WhatsApp via Lusha — 1ª rodada (5 contatos)" },
+  ]},
+  { dia:"Terça-feira", data:"16 jun", tasks:[
+    { id:"p05", tipo:"prop",  text:"Enviar proposta Limpano", badge:"hot" },
+    { id:"p06", tipo:"vis",   text:"Visita à central das redes — manhã" },
+    { id:"p07", tipo:"reun",  text:"Contato Scala — confirmar data da reunião de apresentação" },
+    { id:"p08", tipo:"pros",  text:"WhatsApp via Lusha — 2ª rodada (5 contatos)" },
+  ]},
+  { dia:"Quarta-feira", data:"17 jun", tasks:[
+    { id:"p09", tipo:"reun",  text:"Reunião Da Colônia — 10h00", badge:"conf" },
+    { id:"p10", tipo:"prop",  text:"Follow-up Limpano se sem resposta" },
+    { id:"p11", tipo:"pros",  text:"LinkedIn — 5 novos contatos: alimentos e higiene" },
+  ]},
+  { dia:"Quinta-feira", data:"18 jun", tasks:[
+    { id:"p12", tipo:"reun",  text:"Ligações de qualificação com leads que responderam" },
+    { id:"p13", tipo:"pros",  text:"LinkedIn — 5 novos contatos: distribuidoras e redes regionais" },
+    { id:"p14", tipo:"prop",  text:"Follow-up Scala — confirmar reunião" },
+    { id:"p15", tipo:"prod",  text:"Documentar case Friboi (SLA 72h / 300+ colaboradores)" },
+  ]},
+  { dia:"Sexta-feira", data:"19 jun", tasks:[
+    { id:"p16", tipo:"pros",  text:"WhatsApp — 2ª mensagem para contatos sem resposta" },
+    { id:"p17", tipo:"vis",   text:"Revisão geral: status de cada lead, proposta e reunião" },
+    { id:"p18", tipo:"prod",  text:"Planejar semana seguinte — definir 3 leads prioritários" },
+  ]},
+];
+
+const TIPO_LABEL = { prop:"Proposta", reun:"Reunião", pros:"Prospecção", prod:"Produção", vis:"Campo" };
+const TIPO_CLS   = { prop:"tp-prop", reun:"tp-reun", pros:"tp-pros", prod:"tp-prod", vis:"tp-vis" };
+
+const DOC_PLAN = "painel_comercial/planejamento_jun15";
+let planState = {};
+
+async function planLoad() {
+  try {
+    const snap = await fbCarregar(DOC_PLAN);
+    if (snap && snap.checks) planState = snap.checks;
+  } catch(e) {}
+  planRender();
+}
+
+async function planSave() {
+  try { await fbSalvar(DOC_PLAN, { checks: planState, updated: new Date().toISOString() }); } catch(e){}
+}
+
+function planRender() {
+  const container = document.getElementById("planDays");
+  if (!container) return;
+  let total = 0, done = 0;
+  PLAN_TASKS.forEach(d => d.tasks.forEach(t => { total++; if(planState[t.id]) done++; }));
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById("planBar").style.width = pct + "%";
+  document.getElementById("planPct").textContent = pct + "%";
+
+  container.innerHTML = PLAN_TASKS.map(d => `
+    <div class="plan-day">
+      <div class="plan-day-header">
+        <div class="plan-day-dot"></div>
+        <div class="plan-day-name">${d.dia}</div>
+        <div class="plan-day-date">${d.data}</div>
+      </div>
+      <div class="plan-tasks">
+        ${d.tasks.map(t => {
+          const isDone = !!planState[t.id];
+          const badge = t.badge === "hot" ? '<span class="plan-badge b-hot">quente</span>' :
+                        t.badge === "new" ? '<span class="plan-badge b-new">hoje</span>' :
+                        t.badge === "conf" ? '<span class="plan-badge b-conf">confirmada</span>' : "";
+          return `<div class="plan-task${isDone?" done":""}" onclick="planToggle('${t.id}')">
+            <div class="plan-cb"><span class="plan-cb-check">✓</span></div>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:3px">
+                <span class="plan-tipo ${TIPO_CLS[t.tipo]}">${TIPO_LABEL[t.tipo]}</span>
+                <span class="plan-task-text">${t.text}${badge}</span>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  `).join("");
+}
+
+function planToggle(id) {
+  planState[id] = !planState[id];
+  planRender();
+  planSave();
+}
+
+// Aguardar Firebase estar pronto
+(function waitFb() {
+  if (window._fbReady) { planLoad(); }
+  else setTimeout(waitFb, 200);
+})();
+</script>
+
+</div>
+
+</div>
+
 
 <script>
 function show(id) {
