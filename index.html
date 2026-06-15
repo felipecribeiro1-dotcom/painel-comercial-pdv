@@ -3599,6 +3599,7 @@ function show(id) {
   var tab  = document.getElementById('t-' + id);
   if (page) page.classList.add('active');
   if (tab)  tab.classList.add('active');
+  if (id === 'plan' && typeof planRender === 'function') { planRender(); }
 }
 </script>
 </body>
