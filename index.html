@@ -3439,38 +3439,53 @@ updateAll();
 <div class="page" id="p-plan" style="padding:1.5rem;overflow-y:auto">
 
 <style>
-.plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.75rem}
 .plan-title{font-size:1.3rem;font-weight:700;color:#1a1a1a}
 .plan-semana{font-size:.85rem;color:#888;margin-top:2px}
 .plan-progress{display:flex;align-items:center;gap:.75rem}
 .plan-bar-wrap{width:160px;height:8px;background:#eee;border-radius:99px;overflow:hidden}
 .plan-bar{height:100%;background:#EA580C;border-radius:99px;transition:width .4s}
 .plan-pct{font-size:.85rem;font-weight:600;color:#EA580C;min-width:36px;text-align:right}
-.plan-day{margin-bottom:1.25rem}
-.plan-day-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+.plan-day{margin-bottom:1.1rem}
+.plan-day-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem}
 .plan-day-dot{width:10px;height:10px;border-radius:50%;background:#EA580C;flex-shrink:0}
 .plan-day-name{font-weight:700;font-size:.95rem;color:#1a1a1a}
 .plan-day-date{font-size:.8rem;color:#888}
-.plan-tasks{display:flex;flex-direction:column;gap:.4rem;padding-left:1.35rem}
-.plan-task{display:flex;align-items:flex-start;gap:.65rem;padding:.55rem .75rem;border-radius:8px;background:#fafafa;border:1px solid #eee;cursor:pointer;transition:background .15s}
-.plan-task:hover{background:#fff3ec}
+.plan-tasks{display:flex;flex-direction:column;gap:.35rem;padding-left:1.25rem;min-height:40px}
+.plan-tasks.drag-over{background:#fff3ec;border-radius:8px;outline:2px dashed #EA580C}
+.plan-task{display:flex;align-items:flex-start;gap:.6rem;padding:.5rem .7rem;border-radius:8px;background:#fafafa;border:1px solid #eee;cursor:grab;transition:background .15s,opacity .2s;user-select:none}
+.plan-task:active{cursor:grabbing;opacity:.7}
 .plan-task.done{background:#f0fdf4;border-color:#bbf7d0}
 .plan-task.done .plan-task-text{text-decoration:line-through;color:#aaa}
-.plan-cb{width:20px;height:20px;border-radius:5px;border:2px solid #ddd;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .2s}
+.plan-task.dragging{opacity:.35}
+.plan-cb{width:20px;height:20px;border-radius:5px;border:2px solid #ddd;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;cursor:pointer;transition:all .2s;flex-shrink:0}
 .plan-task.done .plan-cb{background:#22c55e;border-color:#22c55e}
 .plan-cb-check{display:none;color:#fff;font-size:12px;font-weight:700}
 .plan-task.done .plan-cb-check{display:block}
-.plan-task-text{font-size:.875rem;color:#333;line-height:1.45}
-.plan-badge{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
+.plan-task-body{flex:1;display:flex;flex-direction:column;gap:3px}
+.plan-task-top{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.plan-task-text{font-size:.875rem;color:#333;line-height:1.4;outline:none;border-radius:3px;padding:1px 3px;min-width:40px;cursor:text}
+.plan-task-text:focus{background:#fffbe8;box-shadow:0 0 0 2px #EA580C40}
+.plan-task.done .plan-task-text{pointer-events:none}
+.plan-badge{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px}
 .b-hot{background:#fee2e2;color:#991b1b}
 .b-new{background:#dcfce7;color:#166534}
 .b-conf{background:#dbeafe;color:#1e40af}
-.plan-tipo{font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;margin-right:2px;flex-shrink:0;margin-top:2px}
+.plan-tipo{font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:99px;flex-shrink:0}
 .tp-prop{background:#fff7ed;color:#c2410c}
 .tp-reun{background:#eff6ff;color:#1d4ed8}
 .tp-pros{background:#f0fdf4;color:#15803d}
 .tp-prod{background:#faf5ff;color:#7e22ce}
 .tp-vis{background:#f5f5f4;color:#57534e}
+.plan-drag-handle{color:#ccc;font-size:14px;cursor:grab;flex-shrink:0;margin-top:2px;padding:0 2px}
+.plan-drag-handle:hover{color:#EA580C}
+.plan-add-btn{display:flex;align-items:center;gap:6px;font-size:.8rem;color:#EA580C;background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;margin-top:2px;margin-left:1.25rem}
+.plan-add-btn:hover{background:#fff3ec}
+.plan-ceo-section{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e5e5e5}
+.plan-ceo-title{font-size:.8rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem}
+.plan-ceo-box{width:100%;min-height:80px;border:1.5px solid #e5e5e5;border-radius:10px;padding:.75rem 1rem;font-size:.9rem;color:#333;font-family:inherit;resize:vertical;outline:none;transition:border .2s}
+.plan-ceo-box:focus{border-color:#EA580C}
+.plan-ceo-meta{font-size:.75rem;color:#aaa;margin-top:.35rem;text-align:right}
 </style>
 
 <div class="plan-header">
@@ -3486,100 +3501,197 @@ updateAll();
 
 <div id="planDays"></div>
 
+<div class="plan-ceo-section">
+  <div class="plan-ceo-title">💬 Comentário do CEO</div>
+  <textarea class="plan-ceo-box" id="planCeoComment" placeholder="Insira aqui orientações, prioridades ou feedback para a semana..."></textarea>
+  <div class="plan-ceo-meta" id="planCeoMeta"></div>
+</div>
+
 <script>
-const PLAN_TASKS = [
-  { dia:"Segunda-feira", data:"15 jun", tasks:[
-    { id:"p01", tipo:"prod",  text:"Finalizar deck — inserir slides de Onboarding e Clientes", badge:"new" },
-    { id:"p02", tipo:"pros",  text:"Follow-up nos 10 contatos LinkedIn enviados esta semana" },
-    { id:"p03", tipo:"prop",  text:"Estruturar proposta comercial Limpano", badge:"hot" },
-    { id:"p04", tipo:"pros",  text:"WhatsApp via Lusha — 1ª rodada (5 contatos)" },
-  ]},
-  { dia:"Terça-feira", data:"16 jun", tasks:[
-    { id:"p05", tipo:"prop",  text:"Enviar proposta Limpano", badge:"hot" },
-    { id:"p06", tipo:"vis",   text:"Visita à central das redes — manhã" },
-    { id:"p07", tipo:"reun",  text:"Contato Scala — confirmar data da reunião de apresentação" },
-    { id:"p08", tipo:"pros",  text:"WhatsApp via Lusha — 2ª rodada (5 contatos)" },
-  ]},
-  { dia:"Quarta-feira", data:"17 jun", tasks:[
-    { id:"p09", tipo:"reun",  text:"Reunião Da Colônia — 10h00", badge:"conf" },
-    { id:"p10", tipo:"prop",  text:"Follow-up Limpano se sem resposta" },
-    { id:"p11", tipo:"pros",  text:"LinkedIn — 5 novos contatos: alimentos e higiene" },
-  ]},
-  { dia:"Quinta-feira", data:"18 jun", tasks:[
-    { id:"p12", tipo:"reun",  text:"Ligações de qualificação com leads que responderam" },
-    { id:"p13", tipo:"pros",  text:"LinkedIn — 5 novos contatos: distribuidoras e redes regionais" },
-    { id:"p14", tipo:"prop",  text:"Follow-up Scala — confirmar reunião" },
-    { id:"p15", tipo:"prod",  text:"Documentar case Friboi (SLA 72h / 300+ colaboradores)" },
-  ]},
-  { dia:"Sexta-feira", data:"19 jun", tasks:[
-    { id:"p16", tipo:"pros",  text:"WhatsApp — 2ª mensagem para contatos sem resposta" },
-    { id:"p17", tipo:"vis",   text:"Revisão geral: status de cada lead, proposta e reunião" },
-    { id:"p18", tipo:"prod",  text:"Planejar semana seguinte — definir 3 leads prioritários" },
-  ]},
+const PLAN_DAYS = [
+  { dia:"Segunda-feira", date:"15 jun", id:"seg" },
+  { dia:"Terça-feira",   date:"16 jun", id:"ter" },
+  { dia:"Quarta-feira",  date:"17 jun", id:"qua" },
+  { dia:"Quinta-feira",  date:"18 jun", id:"qui" },
+  { dia:"Sexta-feira",   date:"19 jun", id:"sex" },
 ];
 
 const TIPO_LABEL = { prop:"Proposta", reun:"Reunião", pros:"Prospecção", prod:"Produção", vis:"Campo" };
 const TIPO_CLS   = { prop:"tp-prop", reun:"tp-reun", pros:"tp-pros", prod:"tp-prod", vis:"tp-vis" };
 
+const DEFAULT_TASKS = {
+  seg:[
+    { id:"p01", tipo:"prod",  text:"Finalizar deck — inserir slides de Onboarding e Clientes", badge:"new", done:false },
+    { id:"p02", tipo:"pros",  text:"Follow-up nos 10 contatos LinkedIn enviados esta semana", done:false },
+    { id:"p03", tipo:"prop",  text:"Estruturar proposta comercial Limpano", badge:"hot", done:false },
+    { id:"p04", tipo:"pros",  text:"WhatsApp via Lusha — 1ª rodada (5 contatos)", done:false },
+  ],
+  ter:[
+    { id:"p05", tipo:"prop",  text:"Enviar proposta Limpano", badge:"hot", done:false },
+    { id:"p06", tipo:"vis",   text:"Visita à central das redes — manhã", done:false },
+    { id:"p07", tipo:"reun",  text:"Contato Scala — confirmar data da reunião de apresentação", done:false },
+    { id:"p08", tipo:"pros",  text:"WhatsApp via Lusha — 2ª rodada (5 contatos)", done:false },
+  ],
+  qua:[
+    { id:"p09", tipo:"reun",  text:"Reunião Da Colônia — 10h00", badge:"conf", done:false },
+    { id:"p10", tipo:"prop",  text:"Follow-up Limpano se sem resposta", done:false },
+    { id:"p11", tipo:"pros",  text:"LinkedIn — 5 novos contatos: alimentos e higiene", done:false },
+  ],
+  qui:[
+    { id:"p12", tipo:"reun",  text:"Ligações de qualificação com leads que responderam", done:false },
+    { id:"p13", tipo:"pros",  text:"LinkedIn — 5 novos contatos: distribuidoras e redes regionais", done:false },
+    { id:"p14", tipo:"prop",  text:"Follow-up Scala — confirmar reunião", done:false },
+    { id:"p15", tipo:"prod",  text:"Documentar case Friboi (SLA 72h / 300+ colaboradores)", done:false },
+  ],
+  sex:[
+    { id:"p16", tipo:"pros",  text:"WhatsApp — 2ª mensagem para contatos sem resposta", done:false },
+    { id:"p17", tipo:"vis",   text:"Revisão geral: status de cada lead, proposta e reunião", done:false },
+    { id:"p18", tipo:"prod",  text:"Planejar semana seguinte — definir 3 leads prioritários", done:false },
+  ],
+};
+
 const DOC_PLAN = "painel_comercial/planejamento_jun15";
-let planState = {};
+let planState = { tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)), ceo: "", ceoUpdated: "" };
+let dragTask = null, dragFromDay = null, saveTimer = null;
+
+function genId() { return "t_" + Math.random().toString(36).slice(2,8); }
+
+function planSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { fbSalvar(DOC_PLAN, { ...planState, updated: new Date().toISOString() }); } catch(e){}
+  }, 600);
+}
 
 async function planLoad() {
   try {
     const snap = await fbCarregar(DOC_PLAN);
-    if (snap && snap.checks) planState = snap.checks;
+    if (snap && snap.tasks) planState.tasks = snap.tasks;
+    if (snap && snap.ceo !== undefined) planState.ceo = snap.ceo;
+    if (snap && snap.ceoUpdated) planState.ceoUpdated = snap.ceoUpdated;
   } catch(e) {}
   planRender();
-}
-
-async function planSave() {
-  try { await fbSalvar(DOC_PLAN, { checks: planState, updated: new Date().toISOString() }); } catch(e){}
 }
 
 function planRender() {
   const container = document.getElementById("planDays");
   if (!container) return;
+
   let total = 0, done = 0;
-  PLAN_TASKS.forEach(d => d.tasks.forEach(t => { total++; if(planState[t.id]) done++; }));
+  Object.values(planState.tasks).forEach(tasks => tasks.forEach(t => { total++; if(t.done) done++; }));
   const pct = total ? Math.round(done/total*100) : 0;
   document.getElementById("planBar").style.width = pct + "%";
   document.getElementById("planPct").textContent = pct + "%";
 
-  container.innerHTML = PLAN_TASKS.map(d => `
-    <div class="plan-day">
+  container.innerHTML = PLAN_DAYS.map(d => {
+    const tasks = planState.tasks[d.id] || [];
+    const tasksHtml = tasks.map(t => {
+      const badge = t.badge === "hot"  ? '<span class="plan-badge b-hot">quente</span>' :
+                    t.badge === "new"  ? '<span class="plan-badge b-new">hoje</span>'   :
+                    t.badge === "conf" ? '<span class="plan-badge b-conf">confirmada</span>' : "";
+      return `<div class="plan-task${t.done?" done":""}" draggable="true" data-id="${t.id}" data-day="${d.id}">
+        <span class="plan-drag-handle" title="Arrastar">⠿</span>
+        <div class="plan-cb" onclick="planToggle('${d.id}','${t.id}')"><span class="plan-cb-check">✓</span></div>
+        <div class="plan-task-body">
+          <div class="plan-task-top">
+            <span class="plan-tipo ${TIPO_CLS[t.tipo]||''}">${TIPO_LABEL[t.tipo]||t.tipo}</span>
+            ${badge}
+          </div>
+          <span class="plan-task-text" contenteditable="${t.done?'false':'true'}" 
+            data-id="${t.id}" data-day="${d.id}"
+            onblur="planEditText('${d.id}','${t.id}',this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${t.text}</span>
+        </div>
+        <button onclick="planRemove('${d.id}','${t.id}')" title="Remover" style="background:none;border:none;color:#ddd;cursor:pointer;font-size:14px;flex-shrink:0;padding:0 2px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#ddd'">✕</button>
+      </div>`;
+    }).join("");
+
+    return `<div class="plan-day">
       <div class="plan-day-header">
         <div class="plan-day-dot"></div>
         <div class="plan-day-name">${d.dia}</div>
-        <div class="plan-day-date">${d.data}</div>
+        <div class="plan-day-date">${d.date}</div>
       </div>
-      <div class="plan-tasks">
-        ${d.tasks.map(t => {
-          const isDone = !!planState[t.id];
-          const badge = t.badge === "hot" ? '<span class="plan-badge b-hot">quente</span>' :
-                        t.badge === "new" ? '<span class="plan-badge b-new">hoje</span>' :
-                        t.badge === "conf" ? '<span class="plan-badge b-conf">confirmada</span>' : "";
-          return `<div class="plan-task${isDone?" done":""}" onclick="planToggle('${t.id}')">
-            <div class="plan-cb"><span class="plan-cb-check">✓</span></div>
-            <div style="display:flex;flex-direction:column;gap:2px;flex:1">
-              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:3px">
-                <span class="plan-tipo ${TIPO_CLS[t.tipo]}">${TIPO_LABEL[t.tipo]}</span>
-                <span class="plan-task-text">${t.text}${badge}</span>
-              </div>
-            </div>
-          </div>`;
-        }).join("")}
-      </div>
-    </div>
-  `).join("");
+      <div class="plan-tasks" id="day-${d.id}" data-day="${d.id}">${tasksHtml}</div>
+      <button class="plan-add-btn" onclick="planAddTask('${d.id}')">+ Adicionar tarefa</button>
+    </div>`;
+  }).join("");
+
+  // CEO comment
+  const ceoBox = document.getElementById("planCeoComment");
+  if (ceoBox) {
+    ceoBox.value = planState.ceo || "";
+    document.getElementById("planCeoMeta").textContent = planState.ceoUpdated ? "Atualizado em " + new Date(planState.ceoUpdated).toLocaleString("pt-BR") : "";
+    ceoBox.oninput = () => {
+      planState.ceo = ceoBox.value;
+      planState.ceoUpdated = new Date().toISOString();
+      document.getElementById("planCeoMeta").textContent = "Atualizado em " + new Date().toLocaleString("pt-BR");
+      planSave();
+    };
+  }
+
+  // Drag & Drop
+  document.querySelectorAll(".plan-task").forEach(el => {
+    el.addEventListener("dragstart", e => {
+      dragTask = e.currentTarget.dataset.id;
+      dragFromDay = e.currentTarget.dataset.day;
+      e.currentTarget.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    el.addEventListener("dragend", e => {
+      e.currentTarget.classList.remove("dragging");
+    });
+  });
+
+  document.querySelectorAll(".plan-tasks").forEach(zone => {
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("drop", e => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      const toDay = zone.dataset.day;
+      if (!dragTask || !dragFromDay) return;
+      const fromTasks = planState.tasks[dragFromDay];
+      const idx = fromTasks.findIndex(t => t.id === dragTask);
+      if (idx === -1) return;
+      const [task] = fromTasks.splice(idx, 1);
+      if (!planState.tasks[toDay]) planState.tasks[toDay] = [];
+      planState.tasks[toDay].push(task);
+      dragTask = null; dragFromDay = null;
+      planSave();
+      planRender();
+    });
+  });
 }
 
-function planToggle(id) {
-  planState[id] = !planState[id];
-  planRender();
-  planSave();
+function planToggle(day, id) {
+  const t = (planState.tasks[day]||[]).find(x => x.id === id);
+  if (t) { t.done = !t.done; planSave(); planRender(); }
 }
 
-// Aguardar Firebase estar pronto
+function planEditText(day, id, text) {
+  const t = (planState.tasks[day]||[]).find(x => x.id === id);
+  if (t && text.trim()) { t.text = text.trim(); planSave(); }
+}
+
+function planRemove(day, id) {
+  planState.tasks[day] = (planState.tasks[day]||[]).filter(x => x.id !== id);
+  planSave(); planRender();
+}
+
+function planAddTask(day) {
+  const tipo = ["prop","pros","reun","prod","vis"][Math.floor(Math.random()*3)];
+  const t = { id: genId(), tipo: "pros", text: "Nova tarefa", done: false };
+  if (!planState.tasks[day]) planState.tasks[day] = [];
+  planState.tasks[day].push(t);
+  planSave(); planRender();
+  // Focar no texto da nova tarefa
+  setTimeout(() => {
+    const els = document.querySelectorAll(`#day-${day} .plan-task-text`);
+    if (els.length) { const last = els[els.length-1]; last.focus(); document.execCommand('selectAll'); }
+  }, 100);
+}
+
 (function waitFb() {
   if (window._fbReady) { planLoad(); }
   else setTimeout(waitFb, 200);
