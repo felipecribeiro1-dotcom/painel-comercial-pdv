@@ -28,6 +28,7 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 .content{flex:1;position:relative;overflow:hidden}
 .page{display:none;position:absolute;inset:0}
 .page.active{display:block}
+.page.plan-page.active{display:flex;flex-direction:column}
 
 /* IFRAME */
 .tool-frame{width:100%;height:100%;border:none;display:block}
@@ -3436,7 +3437,7 @@ updateAll();
 " frameborder="0" allowfullscreen></iframe></div>
 
 
-<div class="page" id="p-plan" style="padding:1.5rem;overflow:hidden;display:flex;flex-direction:column">
+<div class="page plan-page" id="p-plan" style="padding:1.5rem;overflow:hidden">
 
 <style>
 .plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem;flex-shrink:0}
@@ -3461,6 +3462,8 @@ updateAll();
 .plan-task.done{background:#f3fbf5;border-color:#cdeed8}
 .plan-task.done .plan-task-text{text-decoration:line-through;color:#aaa}
 .plan-task-row1{display:flex;align-items:flex-start;gap:6px}
+.plan-drag-handle{color:#ccc;font-size:13px;cursor:grab;flex-shrink:0;margin-top:2px;line-height:1;user-select:none}
+.plan-drag-handle:hover{color:#EA580C}
 .plan-cb{width:17px;height:17px;border-radius:5px;border:2px solid #ddd;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;cursor:pointer;transition:all .15s}
 .plan-task.done .plan-cb{background:#22c55e;border-color:#22c55e}
 .plan-cb-check{display:none;color:#fff;font-size:10px;font-weight:700}
@@ -3580,8 +3583,9 @@ function planTaskCard(t, dayId) {
   const badge = t.badge === "hot"  ? '<span class="plan-badge b-hot">quente</span>' :
                 t.badge === "new"  ? '<span class="plan-badge b-new">hoje</span>'   :
                 t.badge === "conf" ? '<span class="plan-badge b-conf">confirmada</span>' : "";
-  return `<div class="plan-task${t.done?" done":""}" draggable="true" data-id="${t.id}" data-day="${dayId}">
+  return `<div class="plan-task${t.done?" done":""}" data-id="${t.id}" data-day="${dayId}">
     <div class="plan-task-row1">
+      <span class="plan-drag-handle" draggable="true" title="Arrastar">⠿</span>
       <div class="plan-cb" onclick="planToggle('${dayId}','${t.id}')"><span class="plan-cb-check">✓</span></div>
       <span class="plan-task-text" contenteditable="${t.done?'false':'true'}"
         onblur="planEditText('${dayId}','${t.id}',this.innerText)"
@@ -3631,14 +3635,18 @@ function planRender() {
     };
   }
 
-  document.querySelectorAll(".plan-task").forEach(el => {
-    el.addEventListener("dragstart", e => {
-      dragTask = e.currentTarget.dataset.id;
-      dragFromDay = e.currentTarget.dataset.day;
-      e.currentTarget.classList.add("dragging");
+  document.querySelectorAll(".plan-drag-handle").forEach(handle => {
+    handle.addEventListener("dragstart", e => {
+      const card = e.currentTarget.closest(".plan-task");
+      dragTask = card.dataset.id;
+      dragFromDay = card.dataset.day;
+      card.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
     });
-    el.addEventListener("dragend", e => e.currentTarget.classList.remove("dragging"));
+    handle.addEventListener("dragend", e => {
+      const card = e.currentTarget.closest(".plan-task");
+      if (card) card.classList.remove("dragging");
+    });
   });
 
   document.querySelectorAll(".plan-col-body").forEach(zone => {
