@@ -1309,6 +1309,40 @@ async function fbInit() {
 })();
 
 // Iniciar Firebase após página carregar
+
+// ── RECEBER DADOS DO FIREBASE VIA POSTMESSAGE ──
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'DASH_LOAD') return;
+  var data = e.data.data;
+  if (!data) return;
+  var campos = ['f1','f2','f3','f4','f5','taxa','weekLabel','statusBadge',
+    'metaFechados','metaPropostas','metaReunioes',
+    'cLinkedIn','cWhats','cLigacao','pLinkedIn','vLinkedIn','pWhats','vWhats','pLigacao','vLigacao',
+    'sAlim','sBeb','sHig','sOut','psAlim','vsAlim','psBeb','vsBeb','psHig','vsHig','psOut','vsOut',
+    'statusLeads','statusAbord','statusReun','statusProp'];
+  campos.forEach(function(id) {
+    if (data[id] === undefined) return;
+    var el = document.getElementById(id);
+    if (!el || el === document.activeElement) return;
+    el.value = data[id];
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+  });
+  if (data.pipelineJSON) {
+    try {
+      var leads = JSON.parse(data.pipelineJSON);
+      var tbody = document.getElementById('pipelineBody');
+      if (tbody && leads.length) {
+        tbody.innerHTML = '';
+        leads.forEach(function(l) {
+          var tr = document.createElement('tr');
+          var statusClass = (l.status||'').toLowerCase().replace(/[^a-z]/g,'-');
+          tr.innerHTML = '<td><input type="text" value="'+(l.empresa||'')+'"></td><td><input type="text" value="'+(l.contato||'')+'"></td><td><input type="text" value="'+(l.canal||'')+'"></td><td><input type="text" value="'+(l.acao||'')+'"></td><td><span class="tag tag-blue">'+(l.status||'')+'</span></td>';
+          tbody.appendChild(tr);
+        });
+      }
+    } catch(e2) {}
+  }
+});
 window.addEventListener('load', () => setTimeout(fbInit, 500));
 </script>
 
@@ -3213,6 +3247,7 @@ function loadFechamento() {
 }
 window.addEventListener('message', function(e) {
   if (!e.data) return;
+  if (e.data.type === 'NAV') { show(e.data.page); return; }
   if (e.data.type === 'FECH_SAVE') {
     db.collection('painel_comercial_fechamento').doc(e.data.mes).set(Object.assign({}, e.data.data, {updated: new Date().toISOString()}));
   }
@@ -3286,6 +3321,7 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:#F8F9FA;color:#1
 <div class=&quot;hdr&quot;>
   <div><h1>📊 Fechamento do Mês</h1><div class=&quot;sub&quot; id=&quot;subLabel&quot;>Resultados consolidados — Apresentação ao CEO</div></div>
   <div style=&quot;display:flex;gap:10px;align-items:center&quot;>
+    <button onclick=&quot;window.parent.postMessage({type:'NAV',page:'home'},'*')&quot; style=&quot;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;&quot;>← Início</button>
     <select class=&quot;mes-sel&quot; id=&quot;mesSel&quot; onchange=&quot;onMes()&quot;></select>
     <button class=&quot;btn-pdf&quot; onclick=&quot;window.print()&quot;>🖨️ PDF</button>
   </div>
