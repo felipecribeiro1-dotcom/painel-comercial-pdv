@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDV Quality — Pipeline de Prospecção</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0D1B2A;--navy2:#162236;--gold:#C9A84C;--green:#1A7A4A;--red:#DC2626;--bg:#F0F3F8;--surface:#fff;--border:#DDE3EE;--text:#1E293B;--muted:#64748B;--faint:#94A3B8}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
+.topbar{background:linear-gradient(135deg,var(--navy),var(--navy2));padding:10px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.topbar h2{color:#fff;font-size:14px;font-weight:800}.topbar p{color:rgba(255,255,255,.45);font-size:11px}
+.metas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px}
+.meta-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+.meta-l{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.meta-v{font-size:20px;font-weight:800;margin:2px 0}
+.meta-v .alvo{font-size:12px;color:var(--faint);font-weight:600}
+.meta-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.meta-fill{height:100%;border-radius:2px;background:var(--gold);transition:.3s}
+.meta-fill.ok{background:var(--green)}
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:0 18px 18px;align-items:start}
+.col{background:rgba(13,27,42,.04);border-radius:10px;padding:8px;min-height:200px}
+.col-hdr{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:4px 6px 8px;display:flex;justify-content:space-between}
+.col-hdr .qtd{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0 7px;font-size:10px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px}
+.card .nm{font-weight:800;font-size:12px}
+.card .emp{color:var(--muted)}
+.card .toque{font-size:9px;color:var(--faint);margin-top:3px}
+.card .toque.atrasado{color:var(--red);font-weight:700}
+.card .acts{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.card .acts button{border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:3px 7px;font-size:9px;font-weight:700;cursor:pointer;color:var(--text)}
+.card .acts button:hover{border-color:var(--gold)}
+.card .acts .go{background:var(--gold);border-color:var(--gold);color:#1a1a1a}
+.card .acts .no{color:var(--red)}
+.vazio{font-size:10px;color:var(--faint);text-align:center;padding:14px 4px}
+@media(max-width:1100px){.board{grid-template-columns:repeat(3,1fr)}.metas{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="topbar" style="flex-wrap:wrap">
+  <div><h2>🎯 Pipeline de Prospecção</h2><p>Funil: 20 leads/dia → 16 reuniões/mês → 8 propostas → 2 fechamentos</p></div><button onclick="lerEmailsEnviados()" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">📨 Sincronizar Outlook</button>
+</div>
+
+<div class="metas" id="metas"></div>
+<div class="board" id="board"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+  authDomain: "painel-pdv-quality.firebaseapp.com",
+  projectId: "painel-pdv-quality",
+  storageBucket: "painel-pdv-quality.firebasestorage.app",
+  messagingSenderId: "1075785754630",
+  appId: "1:1075785754630:web:e7301ed75ff44da800bb87"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Estágios do pipeline. 'sent' (legado) mapeia para 'abordado'.
+const ESTAGIOS = [
+  {id:'pending_approval', nome:'🆕 Novo (aprovar)', cor:'#8B5CF6'},
+  {id:'abordado',         nome:'📤 Abordado',       cor:'#0EA5E9'},
+  {id:'respondeu',        nome:'💬 Respondeu',      cor:'#F59E0B'},
+  {id:'reuniao',          nome:'📅 Reunião',        cor:'#C9A84C'},
+  {id:'proposta',         nome:'📋 Proposta',       cor:'#1A7A4A'},
+  {id:'fechado',          nome:'✅ Fechado',        cor:'#16A34A'},
+];
+const MAPA_LEGADO = {sent:'abordado'};
+
+// Metas mensais (funil desenhado: 400 → 40 respostas → 16 reuniões → 8 propostas → 2 fechamentos)
+const METAS = {abordados_mes:400, reunioes_mes:16, propostas_mes:8, fechados_mes:2};
+
+function diasDesde(ts){
+  if(!ts) return null;
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return Math.floor((Date.now()-d.getTime())/86400000);
+}
+
+let leadsCache = [];
+
+function renderMetas(){
+  const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+  const doMes = l => { const d = l.enviado_em?.toDate?.() || l.criado_em?.toDate?.(); return d && d >= inicioMes; };
+  const abordados = leadsCache.filter(l=>['abordado','respondeu','reuniao','proposta','fechado'].includes(l.stage) && doMes(l)).length;
+  const reunioes = leadsCache.filter(l=>['reuniao','proposta','fechado'].includes(l.stage) && doMes(l)).length;
+  const propostas = leadsCache.filter(l=>['proposta','fechado'].includes(l.stage) && doMes(l)).length;
+  const fechados = leadsCache.filter(l=>l.stage==='fechado' && doMes(l)).length;
+  const cards = [
+    ['Leads abordados no mês', abordados, METAS.abordados_mes],
+    ['Reuniões no mês', reunioes, METAS.reunioes_mes],
+    ['Propostas no mês', propostas, METAS.propostas_mes],
+    ['Fechamentos no mês', fechados, METAS.fechados_mes],
+  ];
+  document.getElementById('metas').innerHTML = cards.map(([l,v,alvo])=>{
+    const pct = Math.min(100, Math.round(v/alvo*100));
+    return `<div class="meta-card"><div class="meta-l">${l}</div><div class="meta-v">${v} <span class="alvo">/ ${alvo}</span></div><div class="meta-bar"><div class="meta-fill ${pct>=100?'ok':''}" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+function botoesPara(l){
+  const b = [];
+  const s = l.stage;
+  if(s==='pending_approval'){ b.push(['go','Aprovar + Enviar','aprovar']); b.push(['no','✕','rejeitar']); }
+  if(s==='abordado'){ b.push(['go','Respondeu','mover:respondeu']); b.push(['no','Sem resposta ✕','mover:perdido']); }
+  if(s==='respondeu'){ b.push(['go','Reunião marcada','mover:reuniao']); b.push(['no','Esfriou ✕','mover:perdido']); }
+  if(s==='reuniao'){ b.push(['go','Proposta enviada','mover:proposta']); b.push(['no','Não avançou ✕','mover:perdido']); }
+  if(s==='proposta'){ b.push(['go','FECHOU! 🎉','mover:fechado']); b.push(['no','Perdeu ✕','mover:perdido']); }
+  return b.map(([cls,txt,acao])=>`<button class="${cls}" data-acao="${acao}" data-id="${l._id}">${txt}</button>`).join('');
+}
+
+function renderBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML = ESTAGIOS.map(est=>{
+    const leads = leadsCache.filter(l=>l.stage===est.id);
+    const cards = leads.length ? leads.map(l=>{
+      const dias = diasDesde(l.ultimo_toque || l.enviado_em || l.criado_em);
+      const toques = l.toques || (l.stage==='abordado'?1:0);
+      const atrasado = l.stage==='abordado' && dias!==null && dias>=3 && toques<3;
+      return `<div class="card">
+        <div class="nm">${l.nome||'(sem nome)'}</div>
+        <div class="emp">${l.empresa||''}${l.cargo?' · '+l.cargo:''}</div>
+        <div class="toque ${atrasado?'atrasado':''}">${toques?`toque ${toques}/3`:'sem toque'}${dias!==null?` · há ${dias}d`:''}${atrasado?' · follow-up hoje 9h':''}</div>
+        <div class="acts">${botoesPara(l)}</div>
+      </div>`;
+    }).join('') : `<div class="vazio">vazio</div>`;
+    return `<div class="col"><div class="col-hdr" style="color:${est.cor}">${est.nome}<span class="qtd">${leads.length}</span></div>${cards}</div>`;
+  }).join('');
+  board.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>agir(btn.dataset.acao, btn.dataset.id)));
+}
+
+async function agir(acao, id){
+  const ref = 
+async function lerEmailsEnviados() {
+  const btn = document.querySelector('button[onclick="lerEmailsEnviados()"]');
+  if(btn){ btn.textContent = '⏳ Lendo Outlook...'; btn.disabled = true; }
+  document.getElementById('emailsSection').style.display = '';
+  document.getElementById('emailsLista').textContent = 'Abrindo Outlook Web...';
+
+  try {
+    // Abre uma janela do Outlook Web Enviados e lê os e-mails via postMessage
+    const outlookUrl = 'https://outlook.live.com/mail/0/sentitems';
+    const outlookWin = window.open(outlookUrl, '_blank', 'width=1,height=1,left=-1000');
+    await new Promise(r => setTimeout(r, 4000));
+
+    // Injeta um script na janela do Outlook pra extrair e-mails e devolver via postMessage
+    try {
+      outlookWin.eval(`
+        setTimeout(() => {
+          const emails = [];
+          document.querySelectorAll('[role="option"]').forEach(row => {
+            const assunto = row.querySelector('[data-convid] span')?.textContent?.trim() ||
+                           row.querySelector('span[title]')?.getAttribute('title') || '';
+            const destinatario = row.querySelector('[class*="sender"]')?.textContent?.trim() || '';
+            const data = row.querySelector('[class*="received"]')?.textContent?.trim() ||
+                        row.querySelector('time')?.getAttribute('datetime') || '';
+            if(assunto || destinatario) emails.push({assunto, destinatario, data});
+          });
+          window.opener.postMessage({type:'OUTLOOK_EMAILS', emails: emails.slice(0,50)}, '*');
+        }, 2000);
+      `);
+    } catch(e) {}
+
+    // Aguarda resposta
+    const emails = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 8000);
+      window.addEventListener('message', function handler(e) {
+        if(e.data?.type === 'OUTLOOK_EMAILS') {
+          clearTimeout(timer);
+          window.removeEventListener('message', handler);
+          resolve(e.data.emails || []);
+        }
+      });
+    });
+
+    try { outlookWin.close(); } catch(e) {}
+
+    // Cruza com leads do pipeline
+    const leads = leadsCache;
+    const emailsComLead = emails.map(email => {
+      const match = leads.find(l =>
+        (l.empresa && email.assunto?.toLowerCase().includes(l.empresa.toLowerCase())) ||
+        (l.nome && email.destinatario?.toLowerCase().includes(l.nome.split(' ')[0]?.toLowerCase())) ||
+        (l.email && email.destinatario?.toLowerCase().includes(l.email?.toLowerCase()))
+      );
+      return { ...email, lead: match || null };
+    });
+
+    // Salva no Firestore
+    await db.collection('meta').doc('emails_enviados').set({
+      lista: emailsComLead.slice(0, 50),
+      atualizado_em: new Date().toISOString()
+    });
+
+    // Renderiza
+    renderEmailsEnviados(emailsComLead);
+    document.getElementById('emailSyncInfo').textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · ${emails.length} e-mails`;
+
+  } catch(e) {
+    document.getElementById('emailsLista').textContent = '❌ Erro ao ler o Outlook: ' + e.message + '. Verifique se o Outlook Web está aberto e logado.';
+  } finally {
+    if(btn){ btn.textContent = '📨 Sincronizar Outlook'; btn.disabled = false; }
+  }
+}
+
+function renderEmailsEnviados(emails) {
+  const lista = document.getElementById('emailsLista');
+  if (!emails.length) { lista.textContent = 'Nenhum e-mail encontrado na pasta Enviados.'; return; }
+  lista.innerHTML = emails.map(e => {
+    const leadTag = e.lead ? `<span style="background:#FEF3C7;color:#92400E;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">▶ ${e.lead.stage === 'proposta'?'Proposta':e.lead.stage === 'fechado'?'Fechado':'No pipeline'}</span>` : '';
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-weight:700;color:var(--text)">${e.assunto||'(sem assunto)'}${leadTag}</div>
+      <div style="color:var(--faint);font-size:10px;margin-top:2px">Para: ${e.destinatario||'—'}</div></div>
+      <div style="font-size:10px;color:var(--faint);white-space:nowrap;margin-left:8px">${e.data||''}</div>
+    </div>`;
+  }).join('');
+}
+
+// Carrega histórico salvo do Firestore ao iniciar
+(async function carregarEmailsSalvos() {
+  try {
+    const snap = await db.collection('meta').doc('emails_enviados').get();
+    if(snap.exists) {
+      const d = snap.data();
+      document.getElementById('emailsSection').style.display = '';
+      renderEmailsEnviados(d.lista || []);
+      document.getElementById('emailSyncInfo').textContent = `Última sync: ${d.atualizado_em ? new Date(d.atualizado_em).toLocaleDateString('pt-BR') : '—'}`;
+    }
+  } catch(e) {}
+})();
+
+db.collection('prospeccao_leads').doc(id);
+  if(acao==='aprovar'){ await aprovarLead(id); return; }
+  if(acao==='preview'){ abrirPreview(id); return; }
+  if(acao==='rejeitar'){ await ref.update({stage:'rejected'}); return; }
+  if(acao.startsWith('mover:')){
+    const novo = acao.split(':')[1];
+    await ref.update({stage:novo, ultimo_toque: firebase.firestore.FieldValue.serverTimestamp()});
+  }
+}
+
+let _previewLeadId = null;
+
+function abrirPreview(id) {
+  db.collection('prospeccao_leads').doc(id).get().then(doc => {
+    const l = doc.data();
+    _previewLeadId = id;
+    document.getElementById('prevNome').textContent = l.nome + ' · ' + l.empresa;
+    document.getElementById('prevPara').textContent = '📧 ' + l.email;
+    document.getElementById('prevAssunto').textContent = l.email_assunto || '';
+    document.getElementById('prevCorpo').innerHTML = l.email_corpo || '';
+    document.getElementById('previewModal').style.display = '';
+    document.getElementById('btnEnviarConfirm').onclick = () => {
+      document.getElementById('previewModal').style.display = 'none';
+      aprovarLead(_previewLeadId);
+    };
+  });
+}
+
+async function aprovarLead(id){
+  const ref = db.collection('prospeccao_leads').doc(id);
+  const doc = await ref.get();
+  const lead = doc.data();
+  try{
+    const resp = await fetch('/.netlify/functions/send-email', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({to: lead.email, subject: lead.email_assunto || 'PDV Quality — presença da sua marca no PDV', html: lead.email_corpo || ''})
+    });
+    if(!resp.ok){ const e = await resp.json().catch(()=>({})); alert('Falha no envio: '+(e.error||resp.status)); return; }
+    await ref.update({stage:'abordado', toques:1, enviado_em: firebase.firestore.FieldValue.serverTimestamp(), ultimo_toque: firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(e){ alert('Erro: '+e.message); }
+}
+
+db.collection('prospeccao_leads').orderBy('criado_em','desc').limit(300).onSnapshot(snap=>{
+  leadsCache = snap.docs.map(d=>{
+    const data = d.data();
+    return {...data, _id:d.id, stage: MAPA_LEGADO[data.stage]||data.stage};
+  }).filter(l=>!['rejected','perdido'].includes(l.stage));
+  renderMetas();
+  renderBoard();
+});
+</script>
+
+<div id="emailsSection" style="display:none;padding:12px 18px 18px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+    <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      📨 Histórico de Contatos — E-mails Enviados (Outlook)
+      <span id="emailSyncInfo" style="font-weight:400;font-size:10px;color:var(--faint)"></span>
+    </div>
+    <div id="emailsLista" style="font-size:11px;color:var(--muted)">Clique em "Sincronizar Outlook" pra carregar.</div>
+  </div>
+</div>
+
+
+<div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow:auto;padding:20px">
+  <div style="background:#fff;max-width:680px;margin:auto;border-radius:12px;overflow:hidden">
+    <div style="background:#0D1B2A;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="color:#C9A84C;font-weight:800;font-size:13px" id="prevNome"></div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px" id="prevPara"></div>
+      </div>
+      <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">✕ Fechar</button>
+    </div>
+    <div style="padding:16px 20px;background:#F8F9FA;border-bottom:1px solid #e5e7eb">
+      <div style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Assunto</div>
+      <div id="prevAssunto" style="font-size:13px;font-weight:700;color:#111827"></div>
+    </div>
+    <div id="prevCorpo" style="padding:24px;font-size:13px;line-height:1.7;color:#111827"></div>
+    <div style="padding:14px 20px;background:#F8F9FA;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('previewModal').style.display='none'" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      <button id="btnEnviarConfirm" style="background:linear-gradient(135deg,#C9A84C,#B8934A);border:none;color:#1a1a1a;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer">✅ Confirmar e Enviar</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

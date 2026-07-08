@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDV Quality — Contratos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0D1B2A;--navy2:#162236;--gold:#C9A84C;--green:#1A7A4A;--bg:#F0F3F8;--surface:#fff;--border:#DDE3EE;--text:#1E293B;--muted:#64748B;--faint:#94A3B8}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+.topbar{background:linear-gradient(135deg,var(--navy),var(--navy2));padding:10px 18px;display:flex;align-items:center;justify-content:space-between}
+.topbar h2{color:#fff;font-size:14px;font-weight:800}.topbar p{color:rgba(255,255,255,.45);font-size:11px}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:0;min-height:calc(100vh - 48px)}
+.side{background:var(--surface);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+.main{padding:20px;overflow-y:auto}
+.section{margin-bottom:20px}
+.section-title{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.upload-box{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:.15s}
+.upload-box:hover{border-color:var(--gold);background:rgba(201,168,76,.05)}
+.upload-box input{display:none}
+.upload-txt{font-size:11px;color:var(--muted);margin-top:6px}
+.tpl-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.tpl-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.tpl-item:hover{border-color:var(--gold)}
+.tpl-item.active{border-color:var(--gold);background:rgba(201,168,76,.08)}
+.tpl-rm{color:var(--faint);cursor:pointer;padding:2px 6px}
+.tpl-rm:hover{color:#dc2626}
+.empty-state{color:var(--faint);text-align:center;padding:60px 20px;font-size:13px}
+.field-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.field-ctx{font-size:10px;color:var(--faint);line-height:1.5;margin-bottom:8px;font-family:'DM Mono',monospace;background:var(--bg);padding:6px 8px;border-radius:6px}
+.field-ctx b{color:var(--gold);background:rgba(201,168,76,.15);padding:0 2px;border-radius:2px}
+.field-row{display:flex;gap:8px;align-items:center}
+.field-label-input{width:160px;font-size:11px;font-weight:700;border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+.field-value-input{flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+.field-value-input:focus,.field-label-input:focus{outline:none;border-color:var(--gold)}
+.btn-primary{background:linear-gradient(135deg,var(--gold),#B8934A);color:#1a1a1a;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:12px;cursor:pointer;width:100%;margin-top:8px}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text)}
+.btn-sec:hover{border-color:var(--gold)}
+.status-box{font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;display:none}
+.status-box.show{display:block}
+.status-box.ok{background:#DCFCE7;color:#166534}
+.status-box.err{background:#FEE2E2;color:#991B1B}
+.an-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.an-card.ok{border-left-color:var(--green)}
+.an-card.atencao{border-left-color:#DC2626}
+.an-card.info{border-left-color:var(--gold)}
+.an-hdr{display:flex;align-items:center;gap:8px;font-weight:800;font-size:12px;margin-bottom:4px}
+.an-badge{font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+.an-badge.ok{background:#DCFCE7;color:#166534}
+.an-badge.atencao{background:#FEE2E2;color:#991B1B}
+.an-badge.info{background:#FEF3C7;color:#92400E}
+.an-desc{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px}
+.an-trecho{font-size:10px;color:var(--text);background:var(--bg);padding:8px 10px;border-radius:6px;font-family:'DM Mono',monospace;line-height:1.5}
+.main-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.main-hdr h3{font-size:15px;font-weight:800}
+.main-hdr p{font-size:11px;color:var(--muted)}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:8px;display:none}
+.progress-fill{height:100%;background:var(--gold);width:0%;transition:.2s}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div><h2>📄 Contratos</h2><p>PDV Quality · Gerar a partir de modelo · Analisar contrato recebido do cliente</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn-sec" id="btnAbaGerar" onclick="mudarAba('gerar')" style="background:rgba(255,255,255,.15);color:#fff;border-color:transparent">📝 Gerar Contrato</button>
+    <button class="btn-sec" id="btnAbaAnalisar" onclick="mudarAba('analisar')" style="color:#fff;border-color:rgba(255,255,255,.3)">🔍 Analisar Contrato do Cliente</button>
+  </div>
+</div>
+
+<div class="wrap" id="abaGerar">
+  <div class="side">
+    <div class="section">
+      <div class="section-title">📂 Importar Modelo</div>
+      <label class="upload-box">
+        <input type="file" id="fileInput" accept=".docx" onchange="importarModelo(this.files[0])">
+        <div style="font-size:24px">📎</div>
+        <div class="upload-txt">Clique para escolher um arquivo .docx</div>
+      </label>
+      <div class="status-box" id="importStatus"></div>
+      <div class="progress-bar" id="pb"><div class="progress-fill" id="pf"></div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📑 Modelos Salvos</div>
+      <div class="tpl-list" id="tplList"><div style="font-size:11px;color:var(--faint)">Nenhum modelo importado ainda.</div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="semModelo" class="empty-state">
+      📄 Importe um modelo de contrato (.docx) na lateral esquerda.<br><br>
+      O sistema detecta automaticamente os campos em branco (xxxx, XX/XX/XXXX, R$ XX.XXX,XX) e monta um formulário aqui pra você preencher.
+    </div>
+
+    <div id="comModelo" style="display:none">
+      <div class="main-hdr">
+        <div><h3 id="tplNome">—</h3><p id="tplInfo">—</p></div>
+        <button class="btn-sec" onclick="baixarModeloOriginal()">⬇ Baixar modelo original</button>
+      </div>
+      <div id="camposList"></div>
+      <button class="btn-primary" id="btnGerar" onclick="gerarContrato()">📥 Gerar Contrato Preenchido (.docx)</button>
+      <div class="status-box" id="gerarStatus"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="abaAnalisar" style="display:none">
+  <div class="side">
+    <div class="section">
+      <div class="section-title">🔍 Analisar Contrato</div>
+      <label class="upload-box">
+        <input type="file" id="fileInputAnalise" accept=".docx,.pdf" onchange="analisarContrato(this.files[0])">
+        <div style="font-size:24px">📥</div>
+        <div class="upload-txt">Envie o contrato do cliente (.docx ou .pdf)</div>
+      </label>
+      <div class="status-box" id="analiseStatus"></div>
+      <div class="progress-bar" id="pbA"><div class="progress-fill" id="pfA"></div></div>
+      <div style="font-size:10px;color:var(--faint);margin-top:10px;line-height:1.5">
+        A análise é automática, por checklist de pontos que costumam gerar risco em contrato de prestação de serviços de merchandising. Não substitui revisão jurídica — é um apoio pra saber onde prestar atenção antes de assinar.
+      </div>
+    </div>
+  </div>
+  <div class="main">
+    <div id="semAnalise" class="empty-state">
+      🔍 Envie um contrato recebido de cliente pra analisar.<br><br>
+      Vou identificar prazo, multa, reajuste, pagamento, exclusividade, responsabilidade trabalhista e outros pontos que merecem atenção antes de assinar.
+    </div>
+    <div id="comAnalise" style="display:none">
+      <div class="main-hdr"><div><h3 id="analiseNome">—</h3><p id="analiseInfo">—</p></div></div>
+      <div id="analiseResultado"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Firebase (mesmo projeto do painel) — guarda os modelos importados pra reuso ──
+const firebaseConfig = {
+  apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+  authDomain: "painel-pdv-quality.firebaseapp.com",
+  projectId: "painel-pdv-quality",
+  storageBucket: "painel-pdv-quality.firebasestorage.app",
+  messagingSenderId: "1075785754630",
+  appId: "1:1075785754630:web:e7301ed75ff44da800bb87"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const dbContratos = firebase.firestore();
+
+let templates = [];      // {id, nome, xmlTagged, camposMeta:[{id,contexto,label,tipo}], docxBase (JSZip original)}
+let templateAtivo = null;
+
+// ── Regex de detecção de placeholders ──
+// x{4,} minúsculo = texto (nome, endereço...) | X{4,} maiúsculo = número/valor longo | XX/XX/XXXX = data | R$ XX.XXX,XX = dinheiro | XX isolado = número curto
+const REGEX_CAMPO = /R\$\s*X+[.,]?X*[.,]?X*|X{1,2}\/X{1,2}\/X{2,4}|x{4,}|X{4,}|\bXX\b|RAZÃO SOCIAL/g;
+
+function inferirLabel(antes, depois, matchTexto){
+  const a = antes.toLowerCase(), d = depois.toLowerCase();
+  if (matchTexto==='RAZÃO SOCIAL') return 'Razão Social (Contratante)'; // rodapé de assinatura — mesmo valor do campo 1
+  // Prioriza o que vem IMEDIATAMENTE ANTES do campo em branco (mais confiável que o que vem depois)
+  if (/\bcnpj\s*$/.test(a)) return 'CNPJ';
+  if (/\bcep:?\s*$/.test(a)) return 'CEP';
+  if (/identidade\s+rg\s*$/.test(a)) return 'RG';
+  if (/\bcpf( sob o)?\s*$/.test(a)) return 'CPF';
+  if (/administrador,\s*$/.test(a)) return 'Nome do Representante';
+  if (/sede na\s*$/.test(a)) return 'Endereço';
+  if (/valor de\s*$/.test(a) && /r\$/i.test(matchTexto)) return 'Valor (R$)';
+  if (/\(\s*$/.test(a) && /^\.\)/.test(d)) return 'Valor por Extenso';
+  if (/contemplando\s*$/.test(a)) return 'Nº de Atendimentos por Loja';
+  if (/serviço nos\s*$/.test(a) || /atendimentos\/loja/.test(d)) return 'Nº de Atendimentos por Loja';
+  if (/início no dia\s*$/.test(a)) return 'Data de Início';
+  if (/janeiro,\s*$/.test(a)) return 'Data de Assinatura';
+  // Fallback: olha o que vem logo depois (indica do que se trata o campo em branco)
+  if (/^,?\s*inscrita no cnpj/.test(d)) return 'Razão Social (Contratante)';
+  if (/^\s*e doravante/.test(d)) return 'CPF';
+  return 'Campo';
+}
+
+async function importarModelo(file){
+  if(!file) return;
+  const status = document.getElementById('importStatus');
+  status.className = 'status-box show';
+  status.textContent = 'Lendo o arquivo...';
+  document.getElementById('pb').style.display = '';
+  document.getElementById('pf').style.width = '20%';
+
+  try{
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    document.getElementById('pf').style.width = '35%';
+
+    // Escaneia o corpo do documento + todos os cabeçalhos e rodapés (alguns modelos colocam campos ali)
+    const arquivosParaEscanear = ['word/document.xml'];
+    Object.keys(zip.files).forEach(nome=>{
+      if(/^word\/(header|footer)\d*\.xml$/.test(nome)) arquivosParaEscanear.push(nome);
+    });
+
+    let camposGlobais = [];
+    let xmlsTagged = {};
+    let campoIdxGlobal = 0;
+
+    for(const caminho of arquivosParaEscanear){
+      const xml = await zip.file(caminho).async('string');
+
+      // 1) Extrai todos os runs <w:t>...</w:t> com posição absoluta no XML
+      const runRegex = /<w:t([^>]*)>([^<]*)<\/w:t>/g;
+      const runs = [];
+      let rm;
+      while((rm = runRegex.exec(xml)) !== null){
+        const innerStart = rm.index + rm[0].indexOf('>') + 1;
+        const innerEnd = innerStart + rm[2].length;
+        runs.push({ xmlStart: rm.index, xmlEnd: rm.index+rm[0].length, innerStart, innerEnd, text: rm[2] });
+      }
+      if(runs.length===0){ xmlsTagged[caminho]=xml; continue; }
+
+      // 2) Concatena o texto de todos os runs e mapeia cada caractere pro run+offset de origem
+      let textoTotal = '';
+      const mapaChar = [];
+      runs.forEach((r, ri) => {
+        for(let i=0;i<r.text.length;i++) mapaChar.push({runIdx:ri, offsetNoRun:i});
+        textoTotal += r.text;
+      });
+
+      // 3) Encontra os campos no texto concatenado
+      const matches = [...textoTotal.matchAll(REGEX_CAMPO)];
+      const camposArquivo = matches.map((m) => {
+        campoIdxGlobal++;
+        const antes = textoTotal.slice(Math.max(0,m.index-35), m.index);
+        const depois = textoTotal.slice(m.index+m[0].length, m.index+m[0].length+35);
+        return {
+          id: campoIdxGlobal, matchTexto: m[0], contexto: antes+'___'+depois,
+          label: inferirLabel(antes, depois, m[0]),
+          tipo: /r\$/i.test(m[0])?'money':/\//.test(m[0])?'date':'text',
+          start: m.index, end: m.index+m[0].length,
+          runInicio: mapaChar[m.index].runIdx, runFim: mapaChar[m.index+m[0].length-1].runIdx,
+          arquivo: caminho
+        };
+      });
+
+      // 4) Substitui de trás pra frente (preserva offsets), criando as tags {{campo_N}} no XML deste arquivo
+      let xmlTagged = xml;
+      for(let i=camposArquivo.length-1;i>=0;i--){
+        const c = camposArquivo[i];
+        const tag = `{{campo_${c.id}}}`;
+        if(c.runInicio === c.runFim){
+          const r = runs[c.runInicio];
+          const localStart = mapaChar[c.start].offsetNoRun;
+          const localEnd = mapaChar[c.end-1].offsetNoRun+1;
+          const novoTextoRun = r.text.slice(0,localStart) + tag + r.text.slice(localEnd);
+          xmlTagged = xmlTagged.slice(0, r.innerStart) + novoTextoRun + xmlTagged.slice(r.innerEnd);
+        } else {
+          const rIni = runs[c.runInicio], rFim = runs[c.runFim];
+          const localStartIni = mapaChar[c.start].offsetNoRun;
+          const localEndFim = mapaChar[c.end-1].offsetNoRun+1;
+          const novoConteudo = rIni.text.slice(0,localStartIni) + tag + rFim.text.slice(localEndFim);
+          xmlTagged = xmlTagged.slice(0, rIni.innerStart) + novoConteudo + xmlTagged.slice(rFim.innerEnd);
+        }
+      }
+      xmlsTagged[caminho] = xmlTagged;
+      camposGlobais.push(...camposArquivo);
+    }
+    document.getElementById('pf').style.width = '80%';
+
+    if(camposGlobais.length===0){
+      status.className = 'status-box show err';
+      status.textContent = '⚠️ Nenhum campo em branco detectado nesse modelo (procurei por xxxx, XX/XX/XXXX, R$ XX.XXX,XX). Se o modelo usa outro padrão, me avise que ajusto a detecção.';
+      document.getElementById('pb').style.display='none';
+      return;
+    }
+    document.getElementById('pf').style.width = '90%';
+
+    const nomeArquivo = file.name.replace(/\.docx$/i,'');
+    const tpl = {
+      id: 'tpl_'+Date.now(),
+      nome: nomeArquivo,
+      xmlsTagged,
+      campos: camposGlobais,
+      zipOriginalBase64: await zip.generateAsync({type:'base64'})
+    };
+    templates.push(tpl);
+    await salvarTemplateFirestore(tpl);
+    renderTplList();
+    selecionarTemplate(tpl.id);
+
+    status.className = 'status-box show ok';
+    status.textContent = `✅ ${camposGlobais.length} campo(s) detectado(s)! Preencha ao lado e gere o contrato.`;
+    document.getElementById('pf').style.width='100%';
+    setTimeout(()=>{document.getElementById('pb').style.display='none';document.getElementById('pf').style.width='0%';},1200);
+  }catch(e){
+    status.className = 'status-box show err';
+    status.textContent = '❌ Erro ao ler o arquivo: '+e.message;
+    document.getElementById('pb').style.display='none';
+  }
+}
+
+async function salvarTemplateFirestore(tpl){
+  try{
+    await dbContratos.collection('contratos_modelos').doc(tpl.id).set({
+      nome: tpl.nome,
+      xmlsTaggedJson: JSON.stringify(tpl.xmlsTagged),
+      campos: tpl.campos,
+      zipOriginalBase64: tpl.zipOriginalBase64,
+      criado_em: new Date().toISOString()
+    });
+  }catch(e){ console.warn('Não foi possível salvar o modelo na nuvem:', e.message); }
+}
+
+async function carregarTemplatesFirestore(){
+  try{
+    const snap = await dbContratos.collection('contratos_modelos').orderBy('criado_em','desc').limit(20).get();
+    templates = snap.docs.map(d=>{
+      const data = d.data();
+      return {id:d.id, ...data, xmlsTagged: JSON.parse(data.xmlsTaggedJson || '{}')};
+    });
+    renderTplList();
+  }catch(e){ console.warn('Não foi possível carregar modelos salvos:', e.message); }
+}
+
+function renderTplList(){
+  const list = document.getElementById('tplList');
+  if(templates.length===0){
+    list.innerHTML = '<div style="font-size:11px;color:var(--faint)">Nenhum modelo importado ainda.</div>';
+    return;
+  }
+  list.innerHTML = templates.map(t=>`
+    <div class="tpl-item ${templateAtivo?.id===t.id?'active':''}" onclick="selecionarTemplate('${t.id}')">
+      <span>📄 ${t.nome}</span>
+      <span class="tpl-rm" onclick="event.stopPropagation();removerTemplate('${t.id}')">✕</span>
+    </div>`).join('');
+}
+
+function selecionarTemplate(id){
+  templateAtivo = templates.find(t=>t.id===id);
+  if(!templateAtivo) return;
+  renderTplList();
+  document.getElementById('semModelo').style.display='none';
+  document.getElementById('comModelo').style.display='';
+  document.getElementById('tplNome').textContent = templateAtivo.nome;
+  document.getElementById('tplInfo').textContent = `${templateAtivo.campos.length} campo(s) para preencher`;
+
+  // Agrupa campos por rótulo — quando o mesmo rótulo aparece mais de uma vez (ex: Razão Social no
+  // início e no rodapé de assinatura), só o primeiro é editável; os demais copiam o valor automaticamente.
+  const primeiroPorLabel = {};
+  templateAtivo.campos.forEach(c=>{
+    if(!(c.label in primeiroPorLabel)) primeiroPorLabel[c.label] = c.id;
+    c.campoOrigemId = primeiroPorLabel[c.label];
+    c.eDuplicado = c.campoOrigemId !== c.id;
+  });
+
+  document.getElementById('camposList').innerHTML = templateAtivo.campos.map(c=>`
+    <div class="field-card">
+      <div class="field-ctx">${c.contexto.replace('___','<b>___</b>')}</div>
+      <div class="field-row">
+        <input class="field-label-input" id="lbl_${c.id}" value="${c.label}" ${c.eDuplicado?'disabled':''}>
+        <input class="field-value-input" id="val_${c.id}" placeholder="${c.eDuplicado?'= mesmo valor do campo acima':'Digite o valor...'}"
+          ${c.eDuplicado?'readonly style="background:var(--bg);color:var(--muted)"':''}>
+      </div>
+    </div>`).join('');
+
+  // Liga a sincronização: ao digitar no campo original, copia pros duplicados
+  templateAtivo.campos.filter(c=>!c.eDuplicado).forEach(origem=>{
+    const duplicados = templateAtivo.campos.filter(c=>c.campoOrigemId===origem.id && c.eDuplicado);
+    if(duplicados.length){
+      document.getElementById('val_'+origem.id).addEventListener('input', e=>{
+        duplicados.forEach(d=>{document.getElementById('val_'+d.id).value = e.target.value;});
+      });
+    }
+  });
+}
+
+async function removerTemplate(id){
+  if(!confirm('Remover esse modelo?')) return;
+  templates = templates.filter(t=>t.id!==id);
+  try{ await dbContratos.collection('contratos_modelos').doc(id).delete(); }catch(e){}
+  if(templateAtivo?.id===id){
+    templateAtivo=null;
+    document.getElementById('semModelo').style.display='';
+    document.getElementById('comModelo').style.display='none';
+  }
+  renderTplList();
+}
+
+function baixarModeloOriginal(){
+  if(!templateAtivo) return;
+  const link = document.createElement('a');
+  link.href = 'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,'+templateAtivo.zipOriginalBase64;
+  link.download = templateAtivo.nome+'_original.docx';
+  link.click();
+}
+
+async function gerarContrato(){
+  if(!templateAtivo) return;
+  const status = document.getElementById('gerarStatus');
+  const btn = document.getElementById('btnGerar');
+  btn.disabled = true;
+
+  try{
+    // Preenche cada arquivo afetado (document.xml + headers/footers, se houver campo neles)
+    const xmlsFinais = {};
+    Object.keys(templateAtivo.xmlsTagged).forEach(caminho=>{
+      xmlsFinais[caminho] = templateAtivo.xmlsTagged[caminho];
+    });
+    let faltando = [];
+    templateAtivo.campos.forEach(c=>{
+      const val = document.getElementById('val_'+c.id).value.trim();
+      if(!val) faltando.push(document.getElementById('lbl_'+c.id).value || ('Campo '+c.id));
+      xmlsFinais[c.arquivo] = xmlsFinais[c.arquivo].split(`{{campo_${c.id}}}`).join(val || '_____');
+    });
+
+    if(faltando.length){
+      status.className='status-box show err';
+      status.textContent = `⚠️ Gerado, mas faltou preencher: ${faltando.join(', ')} (ficou com "_____" no lugar).`;
+    } else {
+      status.className='status-box show ok';
+      status.textContent = '✅ Contrato gerado com sucesso!';
+    }
+
+    // Reconstrói o .docx: pega o zip original e troca cada arquivo afetado
+    const zip = await JSZip.loadAsync(templateAtivo.zipOriginalBase64, {base64:true});
+    Object.keys(xmlsFinais).forEach(caminho=>{ zip.file(caminho, xmlsFinais[caminho]); });
+    const blob = await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = templateAtivo.nome+'_preenchido.docx';
+    link.click();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    status.className='status-box show err';
+    status.textContent = '❌ Erro ao gerar: '+e.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+carregarTemplatesFirestore();
+
+// ══════════════════ ANÁLISE DE CONTRATO DO CLIENTE ══════════════════
+
+function mudarAba(aba){
+  document.getElementById('abaGerar').style.display = aba==='gerar' ? '' : 'none';
+  document.getElementById('abaAnalisar').style.display = aba==='analisar' ? '' : 'none';
+  document.getElementById('btnAbaGerar').style.background = aba==='gerar' ? 'rgba(255,255,255,.15)' : 'transparent';
+  document.getElementById('btnAbaGerar').style.borderColor = aba==='gerar' ? 'transparent' : 'rgba(255,255,255,.3)';
+  document.getElementById('btnAbaAnalisar').style.background = aba==='analisar' ? 'rgba(255,255,255,.15)' : 'transparent';
+  document.getElementById('btnAbaAnalisar').style.borderColor = aba==='analisar' ? 'transparent' : 'rgba(255,255,255,.3)';
+}
+
+// Checklist de pontos relevantes num contrato de prestação de serviços de merchandising/trade marketing,
+// do ponto de vista de quem PRESTA o serviço (a PDV Quality recebendo um contrato de um cliente).
+const CHECKLIST = [
+  { nome:'Prazo de vigência e renovação', regex:/(vig[êe]ncia|prazo de|renovad[ao]s?\s+automaticamente)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não identifiquei cláusula clara de prazo/vigência. Confirme por quanto tempo o contrato vale e se renova automaticamente ou não.',
+    sePresente:'Cláusula de prazo/vigência encontrada.' },
+  { nome:'Multa rescisória e aviso prévio', regex:/(aviso pr[ée]vio|multa\s+(rescis[óo]ria|compensat[óo]ria))/i,
+    severidadeSeAusente:'atencao', seAusente:'Não encontrei previsão de aviso prévio ou multa em caso de rescisão. Isso significa que o cliente pode encerrar o contrato a qualquer momento sem custo — risco pra previsibilidade de receita.',
+    sePresente:'Cláusula de rescisão com aviso prévio/multa encontrada — confira o prazo mínimo exigido.' },
+  { nome:'Reajuste de valores', regex:/(reajuste|diss[íi]dio|ipca|igpm|igp-m)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não encontrei cláusula de reajuste anual. Sem isso, o valor do contrato pode ficar defasado com o tempo (inflação, dissídio da categoria).',
+    sePresente:'Cláusula de reajuste encontrada — confira o índice usado e se depende de aprovação do cliente.' },
+  { nome:'Prazo e forma de pagamento', regex:/(pagamento\s+ser[áa]|dia\s+\d{1,2}\s+de\s+cada|nota fiscal|boleto)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não identifiquei claramente quando e como o pagamento é feito. Confirme a data de vencimento e o prazo de antecedência pra emissão da fatura.',
+    sePresente:'Cláusula de pagamento encontrada — confira a data de vencimento e o prazo de antecedência da fatura.' },
+  { nome:'Multa por atraso de pagamento do cliente', regex:/(atraso\s+no\s+pagamento|mora|juros\s+de\s+\d)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não encontrei proteção contra atraso de pagamento por parte do cliente (multa/juros de mora). Vale negociar a inclusão.',
+    sePresente:'Cláusula de proteção contra atraso de pagamento encontrada.' },
+  { nome:'Responsabilidade trabalhista', regex:/(v[íi]nculo\s+trabalhista|encargos?\s+(trabalhistas|sociais)|responsabilidade\s+trabalhista)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não encontrei cláusula deixando claro que não há vínculo trabalhista entre os promotores e o cliente contratante. Isso é importante pra evitar que o cliente seja responsabilizado solidariamente.',
+    sePresente:'Cláusula de responsabilidade trabalhista encontrada — confira se protege adequadamente os dois lados.' },
+  { nome:'Exclusividade', regex:/exclusivid|exclusiv[oa]/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei cláusula de exclusividade — o contrato provavelmente não impede atender outras marcas nas mesmas lojas.',
+    sePresente:'Cláusula de exclusividade encontrada — confira o escopo exato (marca, categoria, região) pra não fechar mais portas do que pretende.' },
+  { nome:'Confidencialidade e sigilo', regex:/(confidencial|sigilo)/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei cláusula de confidencialidade.',
+    sePresente:'Cláusula de confidencialidade encontrada.' },
+  { nome:'LGPD / proteção de dados', regex:/(lgpd|lei\s+geral\s+de\s+prote[çc][ãa]o|13\.709|dados\s+pessoais)/i,
+    severidadeSeAusente:'atencao', seAusente:'Não encontrei menção à LGPD ou tratamento de dados pessoais. Se o contrato envolve dados de colaboradores/clientes, vale confirmar como isso é tratado.',
+    sePresente:'Cláusula de LGPD/dados pessoais encontrada — confira responsabilidades de cada parte em caso de incidente.' },
+  { nome:'Foro eleito', regex:/foro\s+(da\s+comarca|eleito|de)/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei cláusula de foro. Em caso de disputa, isso pode gerar incerteza sobre onde o processo tramitaria.',
+    sePresente:'Cláusula de foro encontrada — confira se é uma comarca conveniente pra você.' },
+  { nome:'Reembolso de despesas', regex:/reembols/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei cláusula de reembolso de despesas extras.',
+    sePresente:'Cláusula de reembolso de despesas encontrada.' },
+  { nome:'Nível de serviço / efetividade mínima', regex:/(n[íi]vel\s+de\s+servi[çc]o|efetividade|\d{2,3}%\s+de\s+(efetividade|cumprimento))/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei um percentual mínimo de efetividade/cumprimento exigido — isso costuma proteger o prestador contra cobranças por pequenas variações.',
+    sePresente:'Cláusula de nível de serviço/efetividade mínima encontrada — confira se o percentual é viável operacionalmente.' },
+  { nome:'Assinatura eletrônica', regex:/(assinatura\s+eletr[ôo]nica|docusign|icp-brasil)/i,
+    severidadeSeAusente:'info', seAusente:'Não encontrei previsão de assinatura eletrônica — pode ser necessário assinatura física.',
+    sePresente:'Assinatura eletrônica prevista.' }
+];
+
+async function extrairTextoDocx(arrayBuffer){
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  const xml = await zip.file('word/document.xml').async('string');
+  const runRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+  let texto = '';
+  let m;
+  while((m = runRegex.exec(xml)) !== null) texto += m[1] + ' ';
+  return texto;
+}
+
+async function extrairTextoPdf(arrayBuffer){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let texto = '';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    texto += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+  return texto;
+}
+
+async function analisarContrato(file){
+  if(!file) return;
+  const status = document.getElementById('analiseStatus');
+  status.className = 'status-box show';
+  status.textContent = 'Lendo o arquivo...';
+  document.getElementById('pbA').style.display = '';
+  document.getElementById('pfA').style.width = '20%';
+
+  try{
+    const arrayBuffer = await file.arrayBuffer();
+    let texto;
+    if(/\.pdf$/i.test(file.name)) texto = await extrairTextoPdf(arrayBuffer);
+    else texto = await extrairTextoDocx(arrayBuffer);
+    document.getElementById('pfA').style.width = '60%';
+
+    if(!texto || texto.trim().length < 100){
+      status.className = 'status-box show err';
+      status.textContent = '⚠️ Não consegui extrair texto suficiente do arquivo. Se for um PDF escaneado (imagem), não tem como ler o texto automaticamente.';
+      document.getElementById('pbA').style.display='none';
+      return;
+    }
+
+    const resultados = CHECKLIST.map(item=>{
+      const m = texto.match(item.regex);
+      if(m){
+        const idx = texto.indexOf(m[0]);
+        const trecho = texto.slice(Math.max(0,idx-60), idx+120).replace(/\s+/g,' ').trim();
+        return {...item, encontrado:true, trecho, status: item.nome.includes('trabalhista')||item.nome.includes('pagamento do cliente')?'ok':'ok'};
+      }
+      return {...item, encontrado:false, status: item.severidadeSeAusente};
+    });
+
+    const qtdAtencao = resultados.filter(r=>!r.encontrado && r.severidadeSeAusente==='atencao').length;
+
+    document.getElementById('pfA').style.width = '100%';
+    document.getElementById('semAnalise').style.display = 'none';
+    document.getElementById('comAnalise').style.display = '';
+    document.getElementById('analiseNome').textContent = file.name;
+    document.getElementById('analiseInfo').textContent = qtdAtencao>0
+      ? `⚠️ ${qtdAtencao} ponto(s) merecem atenção antes de assinar`
+      : '✅ Nenhum ponto crítico óbvio identificado (ainda assim, revise com calma)';
+
+    document.getElementById('analiseResultado').innerHTML = resultados.map(r=>`
+      <div class="an-card ${r.encontrado?'ok':r.severidadeSeAusente}">
+        <div class="an-hdr">
+          <span>${r.nome}</span>
+          <span class="an-badge ${r.encontrado?'ok':r.severidadeSeAusente}">${r.encontrado?'Encontrado':r.severidadeSeAusente==='atencao'?'Atenção':'Não encontrado'}</span>
+        </div>
+        <div class="an-desc">${r.encontrado?r.sePresente:r.seAusente}</div>
+        ${r.encontrado?`<div class="an-trecho">"...${r.trecho}..."</div>`:''}
+      </div>`).join('');
+
+    status.className = 'status-box show ok';
+    status.textContent = '✅ Análise concluída.';
+    setTimeout(()=>{document.getElementById('pbA').style.display='none';document.getElementById('pfA').style.width='0%';},1000);
+  }catch(e){
+    status.className = 'status-box show err';
+    status.textContent = '❌ Erro ao analisar: '+e.message;
+    document.getElementById('pbA').style.display='none';
+  }
+}
+</script>
+</body>
+</html>

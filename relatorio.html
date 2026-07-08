@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Quality — Relatório Semanal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0D1B2A;
+  --navy2: #162236;
+  --navy3: #1E2F44;
+  --blue: #1B4F8A;
+  --gold: #C9A84C;
+  --gold2: #E8C97A;
+  --white: #FFFFFF;
+  --bg: #F0F3F8;
+  --surface: #FFFFFF;
+  --border: #DDE3EE;
+  --text: #1E293B;
+  --muted: #64748B;
+  --faint: #94A3B8;
+  --green: #1A7A4A;
+  --green-bg: #E1F5EE;
+  --amber: #B45309;
+  --amber-bg: #FEF3C7;
+  --red: #DC2626;
+  --red-bg: #FEE2E2;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  background: var(--navy);
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 18px;
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-logo span {
+  color: var(--gold);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-left: 1px solid rgba(255,255,255,0.2);
+  padding-left: 10px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.week-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--white);
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.week-selector input[type="date"] {
+  background: transparent;
+  border: none;
+  color: var(--gold);
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+
+.btn-print {
+  background: var(--gold);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--navy);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-print:hover { background: var(--gold2); }
+
+/* ── LAYOUT ── */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+/* ── HEADER ── */
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.report-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px;
+  color: var(--navy);
+  line-height: 1.2;
+}
+
+.report-week {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.status-badge.on-track { background: var(--green-bg); color: var(--green); }
+.status-badge.at-risk  { background: var(--amber-bg); color: var(--amber); }
+.status-badge.behind   { background: var(--red-bg); color: var(--red); }
+
+/* ── FUNIL ── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--faint);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.funil {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.funil-card {
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 18px 16px 14px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.funil-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+.funil-accent {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.funil-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.funil-input {
+  font-family: 'DM Serif Display', serif;
+  font-size: 36px;
+  color: var(--text);
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  line-height: 1;
+  padding: 0;
+}
+
+.funil-input:focus { color: var(--blue); }
+.funil-input::placeholder { color: var(--border); }
+
+.funil-meta {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+.funil-meta strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.funil-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 18px;
+  padding-top: 28px;
+}
+
+/* ── GRID 2 COL ── */
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── INPUTS GERAIS ── */
+.field {
+  margin-bottom: 12px;
+}
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.field input[type="number"],
+.field input[type="text"],
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--blue);
+  background: var(--white);
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+/* ── PIPELINE TABLE ── */
+.pipeline-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pipeline-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pipeline-table td {
+  padding: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.pipeline-table tr:last-child td { border-bottom: none; }
+
+.pipeline-table input[type="text"],
+.pipeline-table select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: transparent;
+  outline: none;
+}
+
+.pipeline-table input:focus,
+.pipeline-table select:focus {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.pipeline-table select {
+  cursor: pointer;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.tag-green  { background: var(--green-bg); color: var(--green); }
+.tag-amber  { background: var(--amber-bg); color: var(--amber); }
+.tag-blue   { background: #EFF6FF; color: #1D4ED8; }
+.tag-gray   { background: #F1F5F9; color: #475569; }
+.tag-red    { background: var(--red-bg); color: var(--red); }
+.tag-navy   { background: var(--navy); color: var(--gold); }
+
+/* ── BARRA DE PROGRESSO ── */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 120px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+.progress-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 36px;
+  text-align: right;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── NOTAS ── */
+.nota-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.nota-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.nota-text {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* ── ADD BUTTON ── */
+.btn-add {
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--muted);
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.btn-add:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: #EFF6FF;
+}
+
+/* ── VISÃO GERAL META ── */
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.meta-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.meta-value {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px;
+  color: var(--text);
+}
+
+.meta-sub {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+.meta-bar {
+  height: 4px;
+  background: var(--bg);
+  border-radius: 99px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.meta-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--blue);
+  transition: width 0.5s ease;
+}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--navy);
+  padding: 12px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+}
+
+.bottom-status {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  font-family: 'DM Mono', monospace;
+}
+
+.bottom-status strong {
+  color: var(--gold);
+}
+
+.btn-save {
+  background: var(--blue);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-save:hover { background: #1a4a80; }
+.btn-save.saved { background: var(--green); }
+
+/* ── DIVIDER ── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 20px 0;
+}
+
+/* ── PRINT ── */
+@media print {
+  .topbar, .bottom-bar, .btn-add, .btn-print { display: none !important; }
+  body { background: white; }
+  .container { padding: 20px; max-width: 100%; }
+  .funil-input { font-size: 28px; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="topbar-right">
+    <div class="week-selector">
+      📅 Semana de <input type="date" id="weekDate">
+    </div>
+    <button class="btn-print" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="report-header">
+    <div>
+      <div class="report-title">Relatório de Prospecção</div>
+      <div class="report-week" id="weekLabel">Semana de —</div>
+    </div>
+    <button class="status-badge on-track" id="statusBadge" onclick="cycleStatus()">
+      ● Em dia com a meta
+    </button>
+  </div>
+
+  <!-- META GERAL -->
+  <div class="section-title">Progresso do mês</div>
+  <div class="meta-grid">
+    <div class="meta-card">
+      <div class="meta-label">Clientes fechados</div>
+      <div class="meta-value" id="metaFechados">0</div>
+      <div class="meta-sub">Meta: 2 este mês</div>
+      <div class="meta-bar"><div class="meta-bar-fill" id="barFechados" style="width:0%;background:#1A7A4A"></div></div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Propostas abertas</div>
+      <div class="meta-value" id="metaPropostas">0</div>
+      <div class="meta-sub">Em negociação</div>
+      <div class="meta-bar"><div class="meta-bar-fill" id="barPropostas" style="width:0%;background:#1B4F8A"></div></div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Reuniões realizadas</div>
+      <div class="meta-value" id="metaReunioes">0</div>
+      <div class="meta-sub">Meta: 10–15/semana</div>
+      <div class="meta-bar"><div class="meta-bar-fill" id="barReunioes" style="width:0%;background:#C9A84C"></div></div>
+    </div>
+  </div>
+
+  <!-- FUNIL DA SEMANA -->
+  <div class="section-title" style="margin-top:8px">Funil da semana</div>
+  <div class="funil">
+    <div class="funil-card">
+      <div class="funil-accent" style="background:#1B4F8A"></div>
+      <div class="funil-label">Leads pesquisados</div>
+      <input class="funil-input" type="number" id="f1" placeholder="0" min="0" oninput="calcFunil()">
+      <div class="funil-meta">Meta: <strong>100+</strong></div>
+    </div>
+    <div class="funil-card">
+      <div class="funil-accent" style="background:#0D9488"></div>
+      <div class="funil-label">Abordagens enviadas</div>
+      <input class="funil-input" type="number" id="f2" placeholder="0" min="0" oninput="calcFunil()">
+      <div class="funil-meta">Meta: <strong>100</strong></div>
+    </div>
+    <div class="funil-card">
+      <div class="funil-accent" style="background:#C9A84C"></div>
+      <div class="funil-label">Respostas recebidas</div>
+      <input class="funil-input" type="number" id="f3" placeholder="0" min="0" oninput="calcFunil()">
+      <div class="funil-meta">Taxa: <strong id="taxa">—</strong></div>
+    </div>
+    <div class="funil-card">
+      <div class="funil-accent" style="background:#1A7A4A"></div>
+      <div class="funil-label">Reuniões agendadas</div>
+      <input class="funil-input" type="number" id="f4" placeholder="0" min="0" oninput="calcFunil()">
+      <div class="funil-meta">Meta: <strong>10–15</strong></div>
+    </div>
+    <div class="funil-card">
+      <div class="funil-accent" style="background:#7C3AED"></div>
+      <div class="funil-label">Propostas enviadas</div>
+      <input class="funil-input" type="number" id="f5" placeholder="0" min="0" oninput="calcFunil()">
+      <div class="funil-meta">Meta: <strong>4–5</strong></div>
+    </div>
+  </div>
+
+  <!-- CONVERSÃO POR CANAL -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">📊 Abordagens por canal</div>
+      <div class="field">
+        <label>LinkedIn</label>
+        <input type="number" id="cLinkedIn" placeholder="0" min="0" oninput="calcCanais()">
+      </div>
+      <div class="field">
+        <label>WhatsApp</label>
+        <input type="number" id="cWhats" placeholder="0" min="0" oninput="calcCanais()">
+      </div>
+      <div class="field">
+        <label>Ligação</label>
+        <input type="number" id="cLigacao" placeholder="0" min="0" oninput="calcCanais()">
+      </div>
+      <div class="divider" style="margin:12px 0"></div>
+      <div class="progress-row">
+        <span class="progress-label">LinkedIn</span>
+        <div class="progress-track"><div class="progress-fill" id="pLinkedIn" style="width:0%;background:#1B4F8A"></div></div>
+        <span class="progress-val" id="vLinkedIn">0%</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">WhatsApp</span>
+        <div class="progress-track"><div class="progress-fill" id="pWhats" style="width:0%;background:#0D9488"></div></div>
+        <span class="progress-val" id="vWhats">0%</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Ligação</span>
+        <div class="progress-track"><div class="progress-fill" id="pLigacao" style="width:0%;background:#C9A84C"></div></div>
+        <span class="progress-val" id="vLigacao">0%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏭 Abordagens por setor</div>
+      <div class="field">
+        <label>Alimentos</label>
+        <input type="number" id="sAlim" placeholder="0" min="0" oninput="calcSetores()">
+      </div>
+      <div class="field">
+        <label>Bebidas</label>
+        <input type="number" id="sBeb" placeholder="0" min="0" oninput="calcSetores()">
+      </div>
+      <div class="field">
+        <label>Higiene / Limpeza</label>
+        <input type="number" id="sHig" placeholder="0" min="0" oninput="calcSetores()">
+      </div>
+      <div class="field">
+        <label>Outros</label>
+        <input type="number" id="sOut" placeholder="0" min="0" oninput="calcSetores()">
+      </div>
+      <div class="divider" style="margin:12px 0"></div>
+      <div class="progress-row">
+        <span class="progress-label">Alimentos</span>
+        <div class="progress-track"><div class="progress-fill" id="psAlim" style="width:0%;background:#1B4F8A"></div></div>
+        <span class="progress-val" id="vsAlim">0%</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Bebidas</span>
+        <div class="progress-track"><div class="progress-fill" id="psBeb" style="width:0%;background:#0D9488"></div></div>
+        <span class="progress-val" id="vsBeb">0%</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Higiene</span>
+        <div class="progress-track"><div class="progress-fill" id="psHig" style="width:0%;background:#C9A84C"></div></div>
+        <span class="progress-val" id="vsHig">0%</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Outros</span>
+        <div class="progress-track"><div class="progress-fill" id="psOut" style="width:0%;background:#7C3AED"></div></div>
+        <span class="progress-val" id="vsOut">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIPELINE ATIVO -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">📋 Pipeline ativo — oportunidades em andamento</div>
+    <table class="pipeline-table">
+      <thead>
+        <tr>
+          <th style="width:22%">Empresa</th>
+          <th style="width:18%">Contato</th>
+          <th style="width:16%">Cargo</th>
+          <th style="width:14%">Último contato</th>
+          <th style="width:16%">Próxima ação</th>
+          <th style="width:14%">Status</th>
+        </tr>
+      </thead>
+      <tbody id="pipelineBody">
+      </tbody>
+    </table>
+    <button class="btn-add" style="margin-top:10px" onclick="addPipelineRow()">+ Adicionar oportunidade</button>
+  </div>
+
+  <!-- DESTAQUES + OBSTÁCULOS -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">✅ Destaques da semana</div>
+      <div id="destaquesContainer"></div>
+      <button class="btn-add" onclick="addNota('destaques', '#1A7A4A')">+ Adicionar destaque</button>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Obstáculos e bloqueios</div>
+      <div id="obstaculosContainer"></div>
+      <button class="btn-add" onclick="addNota('obstaculos', '#B45309')">+ Adicionar obstáculo</button>
+    </div>
+  </div>
+
+  <!-- PLANO PRÓXIMA SEMANA -->
+  <div class="card" style="margin-top:16px;margin-bottom:80px">
+    <div class="card-title">🎯 Foco da próxima semana</div>
+    <div class="grid2" style="margin-bottom:0">
+      <div class="field">
+        <label>Principal prioridade</label>
+        <input type="text" placeholder="Ex: Fechar proposta com Melitta">
+      </div>
+      <div class="field">
+        <label>Meta de reuniões</label>
+        <input type="number" placeholder="Ex: 12" min="0">
+      </div>
+      <div class="field">
+        <label>Empresas no radar</label>
+        <input type="text" placeholder="Ex: Vigor, Ducoco, McCain">
+      </div>
+      <div class="field">
+        <label>Observação para o CEO</label>
+        <textarea placeholder="Ex: Preciso validar proposta de piloto com desconto..."></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="bottom-status">
+    Leads: <strong id="statusLeads">0</strong> ·
+    Abordagens: <strong id="statusAbord">0</strong> ·
+    Reuniões: <strong id="statusReun">0</strong> ·
+    Propostas: <strong id="statusProp">0</strong>
+  </div>
+  <button class="btn-save" id="btnSave" onclick="salvar()">💾 Salvar relatório</button>
+</div>
+
+<script>
+// ── DATA ──
+const today = new Date();
+document.getElementById('weekDate').valueAsDate = today;
+updateWeekLabel();
+
+document.getElementById('weekDate').addEventListener('change', updateWeekLabel);
+
+function updateWeekLabel() {
+  const d = document.getElementById('weekDate').value;
+  if (!d) return;
+  const dt = new Date(d + 'T00:00:00');
+  const opts = { day: '2-digit', month: 'long', year: 'numeric' };
+  document.getElementById('weekLabel').textContent =
+    'Semana de ' + dt.toLocaleDateString('pt-BR', opts);
+}
+
+// ── STATUS ──
+const statuses = [
+  { cls: 'on-track', icon: '●', text: 'Em dia com a meta' },
+  { cls: 'at-risk',  icon: '▲', text: 'Atenção — risco' },
+  { cls: 'behind',   icon: '✕', text: 'Abaixo da meta' },
+];
+let statusIdx = 0;
+
+function cycleStatus() {
+  statusIdx = (statusIdx + 1) % statuses.length;
+  const s = statuses[statusIdx];
+  const b = document.getElementById('statusBadge');
+  b.className = 'status-badge ' + s.cls;
+  b.textContent = s.icon + ' ' + s.text;
+}
+
+// ── FUNIL ──
+// ── SINCRONIZAÇÃO AUTOMÁTICA DO PIPELINE DE PROSPECÇÃO ──
+// Lê a coleção prospeccao_leads do Firestore e preenche os campos f1-f5
+// automaticamente, sem necessidade de digitar manualmente no relatório.
+async function sincronizarPipelineProspeccao() {
+  try {
+    const snap = await db.collection('prospeccao_leads').get();
+    if (snap.empty) return;
+
+    const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+    const doMes = (lead) => {
+      const d = lead.criado_em ? new Date(lead.criado_em) : null;
+      return d && d >= inicioMes;
+    };
+
+    let novos=0, abordados=0, respondeu=0, reunioes=0, propostas=0, fechados=0;
+    const leadsAtivos = []; // pra preencher a tabela de pipeline
+
+    snap.docs.forEach(doc => {
+      const l = doc.data();
+      if (['rejected','perdido'].includes(l.stage)) return;
+      if (l.stage === 'pending_approval') novos++;
+      if (['abordado','sent'].includes(l.stage)) abordados++;
+      if (l.stage === 'respondeu') respondeu++;
+      if (l.stage === 'reuniao') reunioes++;
+      if (l.stage === 'proposta') { propostas++; leadsAtivos.push(l); }
+      if (l.stage === 'fechado') { fechados++; leadsAtivos.push(l); }
+      // leads em reunião também vão pra tabela de pipeline
+      if (l.stage === 'reuniao') leadsAtivos.push(l);
+    });
+
+    const totalAbordados = abordados + respondeu + reunioes + propostas + fechados;
+
+    // Preenche os campos do funil (sem sobrescrever se o usuário tiver editado manual)
+    function setIfEmpty(id, val) {
+      const el = document.getElementById(id);
+      if (el && el !== document.activeElement) el.value = val || 0;
+    }
+    setIfEmpty('f1', novos + totalAbordados); // total de leads no funil
+    setIfEmpty('f2', totalAbordados);         // abordados
+    setIfEmpty('f3', respondeu);              // respostas
+    setIfEmpty('f4', reunioes);               // reuniões
+    setIfEmpty('f5', propostas);              // propostas
+
+    calcFunil();
+
+    // Atualiza a tabela de pipeline com leads de reuniao/proposta/fechado
+    const tbody = document.getElementById('pipelineBody');
+    if (tbody && leadsAtivos.length > 0) {
+      const STATUS_MAP = { reuniao: 'Reunião marcada', proposta: 'Proposta enviada', fechado: '✅ Fechado' };
+      tbody.innerHTML = leadsAtivos.map(l => `
+        <tr>
+          <td>${l.empresa || '—'}</td>
+          <td>${l.nome || '—'}</td>
+          <td>${l.cargo || '—'}</td>
+          <td>${l.ultimo_toque ? new Date(l.ultimo_toque.toDate ? l.ultimo_toque.toDate() : l.ultimo_toque).toLocaleDateString('pt-BR') : '—'}</td>
+          <td>—</td>
+          <td><span style="font-size:11px;font-weight:700;color:#C9A84C">${STATUS_MAP[l.stage] || l.stage}</span></td>
+        </tr>`).join('');
+    }
+
+    // Atualiza indicador visual
+    const ind = document.getElementById('syncProspIndicator');
+    if (ind) ind.textContent = `Sincronizado às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+  } catch(e) {
+    console.warn('sincronizarPipelineProspeccao:', e.message);
+  }
+}
+
+function calcFunil() {
+  const f1 = +document.getElementById('f1').value || 0;
+  const f2 = +document.getElementById('f2').value || 0;
+  const f3 = +document.getElementById('f3').value || 0;
+  const f4 = +document.getElementById('f4').value || 0;
+  const f5 = +document.getElementById('f5').value || 0;
+
+  const taxa = f2 > 0 ? Math.round((f3 / f2) * 100) + '%' : '—';
+  document.getElementById('taxa').textContent = taxa;
+
+  // bottom bar
+  document.getElementById('statusLeads').textContent = f1;
+  document.getElementById('statusAbord').textContent = f2;
+  document.getElementById('statusReun').textContent = f4;
+  document.getElementById('statusProp').textContent = f5;
+
+  // meta cards
+  document.getElementById('metaReunioes').textContent = f4;
+  document.getElementById('metaPropostas').textContent = f5;
+  document.getElementById('barReunioes').style.width = Math.min((f4/15)*100, 100) + '%';
+  document.getElementById('barPropostas').style.width = Math.min((f5/5)*100, 100) + '%';
+}
+
+// ── CANAIS ──
+function calcCanais() {
+  const li = +document.getElementById('cLinkedIn').value || 0;
+  const wh = +document.getElementById('cWhats').value || 0;
+  const lg = +document.getElementById('cLigacao').value || 0;
+  const tot = li + wh + lg || 1;
+  set('pLinkedIn', 'vLinkedIn', li, tot);
+  set('pWhats',    'vWhats',    wh, tot);
+  set('pLigacao',  'vLigacao',  lg, tot);
+}
+
+function calcSetores() {
+  const a = +document.getElementById('sAlim').value || 0;
+  const b = +document.getElementById('sBeb').value  || 0;
+  const h = +document.getElementById('sHig').value  || 0;
+  const o = +document.getElementById('sOut').value  || 0;
+  const tot = a + b + h + o || 1;
+  set('psAlim', 'vsAlim', a, tot);
+  set('psBeb',  'vsBeb',  b, tot);
+  set('psHig',  'vsHig',  h, tot);
+  set('psOut',  'vsOut',  o, tot);
+}
+
+function set(barId, valId, v, tot) {
+  const pct = Math.round((v / tot) * 100);
+  document.getElementById(barId).style.width = pct + '%';
+  document.getElementById(valId).textContent = pct + '%';
+}
+
+// ── PIPELINE ──
+const statusOpts = ['Abordagem', 'Respondeu', 'Reunião agendada', 'Reunião feita', 'Proposta enviada', 'Em negociação', 'Fechado', 'Perdido'];
+const statusColors = {
+  'Abordagem': 'tag-gray', 'Respondeu': 'tag-blue',
+  'Reunião agendada': 'tag-blue', 'Reunião feita': 'tag-blue',
+  'Proposta enviada': 'tag-amber', 'Em negociação': 'tag-amber',
+  'Fechado': 'tag-green', 'Perdido': 'tag-red'
+};
+
+function addPipelineRow(data = {}) {
+  const tbody = document.getElementById('pipelineBody');
+  const tr = document.createElement('tr');
+
+  const status = data.status || 'Abordagem';
+  const tagClass = statusColors[status] || 'tag-gray';
+
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Ex: Vigor" value="${data.empresa||''}"></td>
+    <td><input type="text" placeholder="Nome" value="${data.contato||''}"></td>
+    <td><input type="text" placeholder="Gerente TM" value="${data.cargo||''}"></td>
+    <td><input type="date" value="${data.data||''}"></td>
+    <td><input type="text" placeholder="Ex: Enviar proposta" value="${data.acao||''}"></td>
+    <td>
+      <select onchange="updateTag(this)">
+        ${statusOpts.map(s => `<option value="${s}" ${s===status?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </td>
+  `;
+  tbody.appendChild(tr);
+
+  // atualizar fechados ao mudar status
+  tr.querySelector('select').addEventListener('change', updateFechados);
+  updateFechados();
+}
+
+function updateTag(sel) {
+  updateFechados();
+}
+
+function updateFechados() {
+  const selects = document.querySelectorAll('#pipelineBody select');
+  let fechados = 0;
+  selects.forEach(s => { if (s.value === 'Fechado') fechados++; });
+  document.getElementById('metaFechados').textContent = fechados;
+  document.getElementById('barFechados').style.width = Math.min((fechados/2)*100, 100) + '%';
+}
+
+// Inicializar com 3 linhas vazias
+addPipelineRow();
+addPipelineRow();
+addPipelineRow();
+
+// ── NOTAS ──
+function addNota(containerId, color) {
+  const container = document.getElementById(containerId + 'Container');
+  const div = document.createElement('div');
+  div.className = 'nota-row';
+  div.innerHTML = `
+    <div class="nota-dot" style="background:${color}"></div>
+    <input type="text" class="nota-text" placeholder="Descreva aqui..." style="border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--muted);outline:none;width:100%;padding:2px 0">
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px;padding:0 4px">✕</button>
+  `;
+  container.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+// Inicializar com 2 notas vazias de cada
+addNota('destaques', '#1A7A4A');
+addNota('destaques', '#1A7A4A');
+addNota('obstaculos', '#B45309');
+addNota('obstaculos', '#B45309');
+
+// ── SALVAR (localStorage) ──
+function salvar() {
+  const btn = document.getElementById('btnSave');
+  btn.textContent = '✓ Salvo!';
+  btn.classList.add('saved');
+  setTimeout(() => {
+    btn.textContent = '💾 Salvar relatório';
+    btn.classList.remove('saved');
+  }, 2000);
+}
+</script>
+
+<script>
+// ── FIREBASE SYNC ──
+const firebaseConfig = {
+  apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+  authDomain: "painel-pdv-quality.firebaseapp.com",
+  projectId: "painel-pdv-quality",
+  storageBucket: "painel-pdv-quality.firebasestorage.app",
+  messagingSenderId: "1075785754630",
+  appId: "1:1075785754630:web:e7301ed75ff44da800bb87"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_DASH = 'painel_comercial/dashboard';
+
+const DOC_CHK  = 'painel_comercial/checklist';
+const DOC_FECH = 'painel_comercial/fechamento';
+const DOC_REUN = 'painel_comercial/reunioes';
+
+function syncStatus(msg, cor) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-txt');
+  if (dot) dot.style.background = cor;
+  if (txt) txt.textContent = msg;
+}
+
+// ── SALVAR NO FIRESTORE ──
+async function fbSalvar(docPath, data) {
+  try {
+    await db.doc(docPath).set(data, { merge: true });
+    syncStatus('Salvo ✓', '#4ADE80');
+    setTimeout(() => syncStatus('Sincronizado', '#4ADE80'), 2000);
+  } catch(e) {
+    console.error('Firebase save error:', e);
+    syncStatus('Erro ao salvar', '#F87171');
+  }
+}
+
+// ── CARREGAR DO FIRESTORE ──
+async function fbCarregar(docPath) {
+  try {
+    const snap = await db.doc(docPath).get();
+    return snap.exists ? snap.data() : null;
+  } catch(e) {
+    console.error('Firebase load error:', e);
+    return null;
+  }
+}
+
+// ── LISTENER REALTIME ──
+function fbListen(docPath, callback) {
+  return db.doc(docPath).onSnapshot(snap => {
+    if (snap.exists) callback(snap.data());
+  }, err => {
+    console.error('Firebase listen error:', err);
+    syncStatus('Offline', '#F87171');
+  });
+}
+
+// ── OVERRIDE: salvar contatos no Firestore em vez de localStorage ──
+// Interceptar a função salvar() original dos contatos
+window._fbReady = false;
+
+async function fbInit() {
+  try {
+    syncStatus('Conectando...', '#FCD34D');
+
+    // Carregar dashboard
+    const dashData = await fbCarregar(DOC_DASH);
+    if (dashData) {
+      // Aplicar campos do dashboard
+      Object.keys(dashData).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.tagName !== 'BUTTON') {
+          if (el.tagName === 'SELECT') el.value = dashData[id];
+          else if (el.type === 'checkbox') el.checked = dashData[id];
+          else el.value = dashData[id];
+        }
+      });
+      // Recalcular se houver funções de calc
+      ['calcFunil','calcCanais','calcSetores','dash_calcFunil','dash_calcCanais'].forEach(fn => {
+        if (typeof window[fn] === 'function') window[fn]();
+      });
+    }
+
+    // Carregar checklist
+    const chkData = await fbCarregar(DOC_CHK);
+    if (chkData && chkData.itens) {
+      try {
+        chkData.itens.forEach(item => {
+          const el = document.getElementById(item.id);
+          if (el && el.type === 'checkbox') el.checked = item.checked;
+        });
+        ['updateAll','chk_updateAll'].forEach(fn => {
+          if (typeof window[fn] === 'function') window[fn]();
+        });
+      } catch(e) {}
+    }
+
+    syncStatus('Sincronizado ✓', '#4ADE80');
+    window._fbReady = true;
+
+    // Exporta fbSalvar e fbCarregar pro iframe pai (index.html) — o planejamento depende disso
+    if (window.parent && window.parent !== window) {
+      window.parent.fbSalvar = fbSalvar;
+      window.parent.fbCarregar = fbCarregar;
+      window.parent._fbReady = true;
+    }
+
+    // Sincronização automática do pipeline de prospecção (lê coleção prospeccao_leads)
+    sincronizarPipelineProspeccao();
+    setInterval(sincronizarPipelineProspeccao, 5 * 60 * 1000); // atualiza a cada 5 min
+
+    // Listeners realtime
+
+
+    fbListen(DOC_DASH, data => {
+      if (!window._fbReady || document.activeElement?.closest('#tab-dash')) return;
+      Object.keys(data).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el !== document.activeElement) {
+          if (el.tagName === 'SELECT') el.value = data[id];
+          else if (el.type !== 'checkbox') el.value = data[id];
+        }
+      });
+    });
+
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    syncStatus('Offline — dados locais', '#F87171');
+  }
+}
+
+// Interceptar salvamentos existentes para também salvar no Firebase
+(function() {
+  // Salvar contatos: interceptar função salvar() dos contatos
+  const _origSalvar = window.cont_salvar || window.salvar;
+  
+
+
+  // Interceptar mudanças no dashboard: salvar quando campos mudam
+  document.addEventListener('input', function(e) {
+    if (!window._fbReady) return;
+    const el = e.target;
+    const pane = el.closest('#page-dash');
+    if (pane && el.id) {
+      clearTimeout(window._dashSaveTimer);
+      window._dashSaveTimer = setTimeout(() => {
+        const dashEls = document.querySelectorAll('#page-dash [id]');
+        const data = {};
+        dashEls.forEach(el => {
+          if (el.id && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) {
+            data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+          }
+        });
+        fbSalvar(DOC_DASH, { ...data, updated: new Date().toISOString() });
+        atualizarFechamento(data);
+        syncStatus('Salvando...', '#FCD34D');
+      }, 1500);
+    }
+    // Checklist
+    const chkPane = el.closest('#page-chk');
+    if (chkPane) {
+      clearTimeout(window._chkSaveTimer);
+      window._chkSaveTimer = setTimeout(() => {
+        const checkboxes = document.querySelectorAll('#page-chk input[type=checkbox]');
+        const itens = Array.from(checkboxes).map(cb => ({ id: cb.id, checked: cb.checked })).filter(i => i.id);
+        fbSalvar(DOC_CHK, { itens, updated: new Date().toISOString() });
+        syncStatus('Salvando...', '#FCD34D');
+      }, 800);
+    }
+  });
+
+  // Interceptar clicks em checkboxes do checklist
+  document.addEventListener('change', function(e) {
+    if (!window._fbReady) return;
+    if (e.target.closest('#page-chk')) {
+      clearTimeout(window._chkSaveTimer);
+      window._chkSaveTimer = setTimeout(() => {
+        const checkboxes = document.querySelectorAll('#page-chk input[type=checkbox]');
+        const itens = Array.from(checkboxes).map(cb => ({ id: cb.id, checked: cb.checked })).filter(i => i.id);
+        fbSalvar(DOC_CHK, { itens, updated: new Date().toISOString() });
+      }, 500);
+    }
+  });
+})();
+
+// Iniciar Firebase após página carregar
+
+
+// ── CLAUDE API — Preenchimento automático do relatório ──
+async function gerarComClaude() {
+  const btn = document.getElementById('btnClaude');
+  const icon = document.getElementById('claudeIcon');
+  const label = document.getElementById('claudeLabel');
+  
+  icon.textContent = '⏳';
+  label.textContent = 'Gerando...';
+  btn.disabled = true;
+  
+  // Coletar dados do Firebase disponíveis
+  const f1 = document.getElementById('f1')?.value || '0';
+  const f2 = document.getElementById('f2')?.value || '0';
+  const f3 = document.getElementById('f3')?.value || '0';
+  const f4 = document.getElementById('f4')?.value || '0';
+  const f5 = document.getElementById('f5')?.value || '0';
+  const cLi = document.getElementById('cLinkedIn')?.value || '0';
+  const cWh = document.getElementById('cWhats')?.value || '0';
+  const sAl = document.getElementById('sAlim')?.value || '0';
+  const sBe = document.getElementById('sBeb')?.value || '0';
+  const sHi = document.getElementById('sHig')?.value || '0';
+  const sOu = document.getElementById('sOut')?.value || '0';
+  const taxa = document.getElementById('taxa')?.textContent || '';
+  const weekLabel = document.getElementById('weekLabel')?.textContent || '';
+  
+  const prompt = `Você é o assistente do Felipe Ribeiro, Head de Novos Negócios da PDV Quality, uma agência de trade marketing.
+
+Contexto desta semana (${weekLabel || 'semana de 23-27/jun/2026'}):
+- Leads pesquisados: ${f1}
+- Abordagens enviadas: ${f2}  
+- Respostas recebidas: ${f3} (taxa: ${taxa || '35%'})
+- Reuniões agendadas: ${f4}
+- Propostas enviadas: ${f5}
+- LinkedIn: ${cLi} abordagens | WhatsApp: ${cWh} abordagens
+- Alimentos: ${sAl} leads | Bebidas: ${sBe} | Higiene: ${sHi} | Outros: ${sOu}
+
+Pipeline ativo conhecido:
+- Limpano: cliente quente, proposta enviada ou a enviar
+- Scala: reunião a confirmar com Andreia Zeferino
+- Da Colônia: reunião confirmada para esta semana
+
+Tarefa: Preencha o relatório semanal de prospecção com:
+1. "destaques": array com 2-3 destaques concretos da semana (achievements, respostas positivas, reuniões)
+2. "obstaculos": array com 1-2 obstáculos reais (sem resposta, dificuldade de agendar, etc.)
+3. "prioridade": texto da principal prioridade para a próxima semana
+4. "meta_reunioes": número inteiro de meta de reuniões
+5. "empresas_radar": texto com empresas prioritárias
+6. "obs_ceo": mensagem direta ao CEO (Lukas) sobre o andamento
+7. "pipeline": array de objetos com {empresa, contato, acao, status} para Limpano, Scala, Da Colônia e top 2 leads que responderam
+
+Responda APENAS em JSON válido, sem markdown.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+    
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '{}';
+    const clean = text.replace(/```json?|```/g,'').trim();
+    const result = JSON.parse(clean);
+    
+    // Aplicar destaques
+    if (result.destaques?.length) {
+      const cont = document.getElementById('destaquesContainer');
+      if (cont) {
+        cont.innerHTML = '';
+        result.destaques.forEach(d => addNotaValor('destaques', '#1A7A4A', d));
+      }
+    }
+    
+    // Aplicar obstáculos
+    if (result.obstaculos?.length) {
+      const cont = document.getElementById('obstaculosContainer');
+      if (cont) {
+        cont.innerHTML = '';
+        result.obstaculos.forEach(o => addNotaValor('obstaculos', '#B45309', o));
+      }
+    }
+    
+    // Aplicar foco da próxima semana
+    const focoInputs = document.querySelectorAll('.field input, .field textarea');
+    focoInputs.forEach(inp => {
+      const lbl = inp.closest('.field')?.querySelector('label')?.textContent || '';
+      if (lbl.includes('prioridade') && result.prioridade) inp.value = result.prioridade;
+      if (lbl.includes('reuniões') && result.meta_reunioes) inp.value = result.meta_reunioes;
+      if (lbl.includes('radar') && result.empresas_radar) inp.value = result.empresas_radar;
+      if (lbl.includes('CEO') && result.obs_ceo) inp.value = result.obs_ceo;
+    });
+    
+    // Aplicar pipeline
+    if (result.pipeline?.length) {
+      const tbody = document.getElementById('pipelineBody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        result.pipeline.forEach(item => {
+          const tr = document.createElement('tr');
+          const statusClass = (item.status||'').toLowerCase().includes('hot') ? 'tag-red' :
+                              (item.status||'').toLowerCase().includes('conf') ? 'tag-green' : 'tag-blue';
+          tr.innerHTML = '<td><input type="text" value="'+escHTML(item.empresa||'')+'"></td>' +
+            '<td><input type="text" value="'+escHTML(item.contato||'')+'"></td>' +
+            '<td><input type="text" value="—"></td>' +
+            '<td><input type="date" value=""></td>' +
+            '<td><input type="text" value="'+escHTML(item.acao||'')+'"></td>' +
+            '<td><span class="tag '+statusClass+'" style="font-size:10px;padding:2px 8px;border-radius:12px;display:inline-block">'+escHTML(item.status||'Abordagem')+'</span></td>';
+          tbody.appendChild(tr);
+        });
+      }
+    }
+    
+    icon.textContent = '✅';
+    label.textContent = 'Gerado!';
+    setTimeout(() => { icon.textContent = '✨'; label.textContent = 'Preencher com Claude'; btn.disabled = false; }, 3000);
+    
+  } catch(err) {
+    icon.textContent = '❌';
+    label.textContent = 'Erro — tente novamente';
+    console.error('Claude API error:', err);
+    setTimeout(() => { icon.textContent = '✨'; label.textContent = 'Preencher com Claude'; btn.disabled = false; }, 3000);
+  }
+}
+
+function escHTML(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function addNotaValor(tipo, cor, texto) {
+  const cont = document.getElementById(tipo+'Container');
+  if (!cont) return;
+  const div = document.createElement('div');
+  div.className = 'nota-item';
+  div.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0';
+  div.innerHTML = '<div style="width:7px;height:7px;border-radius:50%;background:'+cor+';flex-shrink:0;margin-top:5px"></div>' +
+    '<input type="text" value="'+escHTML(texto)+'" style="border:none;background:transparent;font-size:12.5px;color:#1a1a1a;flex:1;font-family:inherit" oninput="salvar()">'+
+    '<button onclick="this.parentNode.remove();salvar()" style="background:none;border:none;color:#CBD5E1;cursor:pointer;font-size:14px">✕</button>';
+  cont.appendChild(div);
+}
+
+window.addEventListener('load', () => setTimeout(fbInit, 500));
+</script>
+
+</body>
+</html>
