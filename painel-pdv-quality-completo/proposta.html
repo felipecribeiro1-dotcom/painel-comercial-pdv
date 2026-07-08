@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDV Quality — Gerador de Proposta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2A;--navy2:#162236;--blue:#1B4F8A;
+  --gold:#C9A84C;--gold2:#E8C97A;
+  --white:#FFFFFF;--bg:#F0F3F8;--surface:#FFFFFF;
+  --border:#DDE3EE;--text:#1E293B;--muted:#64748B;--faint:#94A3B8;
+  --green:#1A7A4A;--green-bg:#E1F5EE;
+  --amber:#B45309;--amber-bg:#FEF3C7;--red:#DC2626;--red-bg:#FEE2E2;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--navy);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.logo-img{height:26px;object-fit:contain}
+.logo-tag{font-size:11px;color:var(--gold);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-left:1px solid rgba(255,255,255,.15);padding-left:10px;margin-left:10px}
+.topbar-l{display:flex;align-items:center}
+.topbar-r{display:flex;gap:7px}
+.btn-t{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:6px 12px;font-size:12px;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.6);cursor:pointer;font-weight:500}
+.btn-t:hover{background:rgba(255,255,255,.12);color:white}
+.btn-g{background:var(--gold);border:none;border-radius:7px;padding:6px 14px;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--navy);cursor:pointer;font-weight:700}
+.btn-g:hover{background:var(--gold2)}
+.btn-xl{background:#217346;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-family:'DM Sans',sans-serif;color:white;cursor:pointer;font-weight:600;display:none}
+.btn-xl.show{display:block}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:400px 1fr;min-height:calc(100vh - 56px)}
+.painel{background:var(--surface);border-right:1px solid var(--border);padding:16px;overflow-y:auto;height:calc(100vh - 56px);position:sticky;top:56px}
+.pt{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.ps{font-size:11px;color:var(--faint);margin-bottom:12px}
+.sl{font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.field{margin-bottom:8px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px}
+.field input,.field select,.field textarea{width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);background:white}
+.field input[readonly]{color:var(--amber);font-weight:600;cursor:default}
+.field textarea{resize:vertical;min-height:48px;font-size:11px;line-height:1.5}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cr{display:flex;gap:6px;align-items:center}
+.csw{width:30px;height:30px;border-radius:6px;border:2px solid var(--border);cursor:pointer;flex-shrink:0}
+
+/* BLOCOS DE ESTADO */
+.estados-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.estado-bloco{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;position:relative}
+.estado-bloco.ativo{border-color:var(--gold)}
+.estado-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.estado-title{font-size:12px;font-weight:700;color:var(--navy)}
+.estado-remove{background:none;border:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1}
+.estado-remove:hover{color:var(--red)}
+.modo-tog{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px}
+.mb{padding:6px 3px;border:1.5px solid var(--border);border-radius:6px;font-size:10px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;background:var(--bg);color:var(--muted);text-align:center}
+.mb.active{border-color:var(--gold);background:var(--amber-bg);color:var(--amber)}
+.sec-excl-b,.sec-comp-b{display:none}
+.sec-excl-b.show,.sec-comp-b.show{display:block}
+
+.btn-add-uf{width:100%;padding:8px;border:2px dashed var(--border);border-radius:8px;background:transparent;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--muted);cursor:pointer;margin-bottom:10px}
+.btn-add-uf:hover{border-color:var(--blue);color:var(--blue)}
+
+/* UPLOAD */
+.up-area{border:2px dashed var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:6px}
+.up-area:hover,.up-area.drag{border-color:var(--gold);background:var(--amber-bg)}
+.up-area input{display:none}
+.up-ico{font-size:18px;margin-bottom:2px}
+.up-txt{font-size:11px;color:var(--muted);font-weight:500}
+.up-sub{font-size:10px;color:var(--faint)}
+.up-badge{display:none;font-size:10px;font-weight:600;color:var(--green);background:var(--green-bg);padding:2px 8px;border-radius:99px;margin-top:4px}
+.up-badge.show{display:inline-block}
+
+/* PREVIEW */
+.preview{padding:20px;background:var(--bg);overflow-y:auto;height:calc(100vh - 56px)}
+.proposta{max-width:820px;margin:0 auto}
+
+/* CAPA */
+.prop-capa{border-radius:12px;padding:24px;margin-bottom:12px;position:relative;overflow:hidden}
+.capa-bar{height:4px;border-radius:4px 4px 0 0;margin:-24px -24px 18px}
+.capa-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px}
+.marca-nome{font-family:'DM Serif Display',serif;font-size:22px;color:var(--white);line-height:1.15}
+.marca-label{font-size:10px;font-family:'DM Sans',sans-serif;color:var(--gold);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.pdv-side{text-align:right;flex-shrink:0}
+.pdv-logo-img{height:28px;object-fit:contain;filter:brightness(0) invert(1)}
+.pdv-tag{font-size:10px;color:rgba(255,255,255,.3);margin-top:4px}
+.capa-div{height:1px;background:rgba(255,255,255,.08);margin-bottom:12px}
+.capa-meta{display:flex;flex-wrap:wrap;gap:16px}
+.meta-item{font-size:11px;color:rgba(255,255,255,.35)}
+.meta-item strong{display:block;font-size:12px;color:rgba(255,255,255,.8);font-weight:600;margin-bottom:1px}
+
+/* ESTADO BLOCO PROPOSTA */
+.estado-prop{margin-bottom:14px}
+.estado-prop-hdr{background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.estado-prop-uf{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.07em}
+.estado-prop-fmt{font-size:10px;color:rgba(255,255,255,.4)}
+.op-grid{display:grid;gap:10px;padding:12px;background:var(--surface);border-radius:0 0 10px 10px;border:1px solid var(--border);border-top:none}
+.op-grid.dois{grid-template-columns:1fr 1fr}
+.op-grid.um{grid-template-columns:1fr}
+.op-card{background:var(--bg);border-radius:9px;padding:16px;border:1px solid var(--border)}
+.op-bar{height:3px;border-radius:3px 3px 0 0;margin:-16px -16px 12px}
+.op-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:99px;margin-bottom:8px}
+.op-badge.e{background:var(--red-bg);color:var(--red)}
+.op-badge.c{background:var(--amber-bg);color:var(--amber)}
+.op-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px}
+.op-stats{display:flex;flex-direction:column;gap:5px}
+.op-stat{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--surface);border-radius:6px}
+.op-stat.hl{background:var(--red-bg)}.op-stat.hla{background:var(--amber-bg)}
+.osl{font-size:11px;color:var(--muted)}.osl.b{font-weight:700;color:var(--red)}.osl.ba{font-weight:700;color:var(--amber)}
+.osv{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--text)}
+.osv.r{color:var(--red);font-size:14px}.osv.a{color:var(--amber);font-size:14px}
+
+/* TOTAL */
+.total-geral{background:var(--navy);border-radius:10px;padding:18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tg-v{font-family:'DM Serif Display',serif;font-size:34px;color:var(--white);line-height:1}
+.tg-l{font-size:10px;font-weight:700;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.tg-s{font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px}
+.tg-p{font-size:11px;color:rgba(255,255,255,.3);margin-top:3px}
+.tg-r{text-align:right;display:flex;flex-direction:column;gap:5px}
+.tg-rl{font-size:10px;color:rgba(255,255,255,.35)}
+.tg-rv{font-size:12px;font-weight:600;color:rgba(255,255,255,.8);font-family:'DM Mono',monospace}
+
+/* VANTAGENS */
+.vant-wrap{margin-bottom:12px}
+.vant-sec-title{font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px}
+.vant-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.vant-card{background:var(--surface);border-radius:9px;padding:12px;border:1px solid var(--border)}
+.vant-n{font-family:'DM Serif Display',serif;font-size:17px;color:var(--gold);margin-bottom:3px}
+.vant-t{font-size:11px;font-weight:700;color:var(--text);margin-bottom:2px;line-height:1.3;border-radius:3px;padding:1px 3px;margin-left:-3px}
+.vant-t:hover,.vant-d:hover{background:rgba(201,168,76,.08)}
+.vant-t:focus,.vant-d:focus{background:#fff;outline:1.5px dashed var(--gold);outline-offset:1px}
+.vant-d{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* TABELAS */
+.tab-card{background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:10px}
+.tab-hdr{background:var(--navy);padding:9px 14px;display:flex;align-items:center;justify-content:space-between}
+.tab-hdr-t{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em}
+.tab-hdr-b{font-size:11px;font-weight:700;color:var(--gold)}
+.tab-wrap{overflow-x:auto;max-height:280px;overflow-y:auto}
+table.lj{width:100%;border-collapse:collapse}
+table.lj th{font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;background:var(--bg);position:sticky;top:0}
+table.lj td{font-size:11px;color:var(--muted);padding:5px 10px;border-bottom:1px solid var(--border)}
+table.lj tr:last-child td{border-bottom:none}
+table.lj tr:nth-child(even) td{background:#FAFBFC}
+table.lj td.s{color:var(--text);font-weight:500}
+
+/* FOOTER */
+.prop-footer{background:var(--surface);border-radius:10px;padding:12px 16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:14px}
+.fo{font-size:11px;color:var(--faint);line-height:1.5;flex:1}
+.fo strong{color:var(--amber)}
+.fv{text-align:right;font-size:11px;color:var(--faint);flex-shrink:0}
+.fv strong{display:block;font-size:12px;color:var(--text);font-weight:600}
+
+.placeholder{display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:10px;color:var(--faint)}
+
+
+/* PDF só da proposta */
+@media print {
+  body.print-proposta-only .form-section,
+  body.print-proposta-only .topbar,
+  body.print-proposta-only .sidebar,
+  body.print-proposta-only .btn-area,
+  body.print-proposta-only button,
+  body.print-proposta-only .controles,
+  body.print-proposta-only .inputs-area,
+  body.print-proposta-only [id*="input"],
+  body.print-proposta-only [class*="form"],
+  body.print-proposta-only [class*="ctrl"],
+  body.print-proposta-only [class*="config"] {
+    display: none !important;
+  }
+  body.print-proposta-only [id*="proposta"],
+  body.print-proposta-only [class*="proposta"],
+  body.print-proposta-only [id*="preview"],
+  body.print-proposta-only [class*="preview"],
+  body.print-proposta-only .prop-output,
+  body.print-proposta-only #propOutput,
+  body.print-proposta-only #previewArea {
+    display: block !important;
+  }
+}
+
+@media print{
+  .topbar,.painel{display:none!important}
+  .app{grid-template-columns:1fr!important}
+  .preview{height:auto;padding:16px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar-r">
+    <button class="btn-xl" id="btnXL" onclick="downloadExcel()">📊 Baixar Excel</button>
+    <button class="btn-t" onclick="window.print()">🖨 PDF completo</button>
+    <button class="btn-t" style="background:#1a7a4a;color:#fff" onclick="printPropostaOnly()">📄 PDF proposta</button>
+    <button class="btn-g" onclick="gerar()">▶ Gerar Proposta</button>
+  </div>
+</div>
+
+<div class="app">
+<div class="painel">
+  <div class="pt">Dados da Proposta</div>
+  <div class="ps">Preencha e clique em Gerar Proposta</div>
+
+  <div class="sl">🏭 Marca / Cliente</div>
+  <div class="field"><label>Nome da marca</label><input type="text" id="f_marca" placeholder="Ex: Da Colônia Alimentos Naturais"></div>
+  <div class="field"><label>Slogan</label><input type="text" id="f_slogan" placeholder="Ex: Mais Presença, Mais Resultados!"></div>
+  <div class="fr">
+    <div class="field"><label>Responsável</label><input type="text" id="f_resp" placeholder="Ex: Alex"></div>
+    <div class="field"><label>Telefone</label><input type="text" id="f_tel" placeholder="Ex: 21 99999-9999"></div>
+  </div>
+  <div class="fr">
+    <div class="field"><label>Cor primária</label>
+      <div class="cr"><input type="color" id="f_c1" value="#8B4513" class="csw" oninput="document.getElementById('f_c1t').value=this.value">
+      <input type="text" id="f_c1t" value="#8B4513" oninput="document.getElementById('f_c1').value=this.value"></div>
+    </div>
+    <div class="field"><label>Cor secundária</label>
+      <div class="cr"><input type="color" id="f_c2" value="#D4A017" class="csw" oninput="document.getElementById('f_c2t').value=this.value">
+      <input type="text" id="f_c2t" value="#D4A017" oninput="document.getElementById('f_c2').value=this.value"></div>
+    </div>
+  </div>
+
+  <div class="sl">🗺️ Estados e Formatos</div>
+  <div class="estados-wrap" id="estadosWrap"></div>
+  <button class="btn-add-uf" onclick="addEstado()">+ Adicionar outro estado / formato</button>
+
+  <div class="sl">📂 Roteiro Exclusivo (todas as UFs)</div>
+  <div class="up-area" onclick="document.getElementById('fE').click()"
+    ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+    ondrop="event.preventDefault();this.classList.remove('drag');handleFile(event.dataTransfer.files[0],'e')">
+    <input type="file" id="fE" accept=".xlsx,.xls,.csv,.txt" onchange="handleFile(this.files[0],'e')">
+    <div class="up-ico">📎</div>
+    <div class="up-txt">Excel da planilha Exclusivo</div>
+    <div class="up-sub">Colunas: Promotor | CNPJ | Endereço | ... | Rede | Loja | Freq</div>
+    <div class="up-badge" id="bE"></div>
+  </div>
+  <div class="field"><label>Ou cole (Promotor | CNPJ | Endereço | Nº | Bairro | Cidade | CEP | UF | Rede | Loja | Dias SEG/TER/QUA/QUI/SEX/SAB)</label>
+    <textarea id="f_re" rows="3" placeholder="PROMOTOR - 01 | 06.057.223/0329-60 | RUA DR ALFREDO BACKER | 605 | ALCANTARA | SAO GONCALO | 24452001 | RJ | ASSAI | ASSAI ALCANTARA - RJ | SEG,QUA,SEX"></textarea>
+  </div>
+
+  <div class="sl">📂 Roteiro Compartilhado (todas as UFs)</div>
+  <div class="up-area" onclick="document.getElementById('fC').click()"
+    ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+    ondrop="event.preventDefault();this.classList.remove('drag');handleFile(event.dataTransfer.files[0],'c')">
+    <input type="file" id="fC" accept=".xlsx,.xls,.csv,.txt" onchange="handleFile(this.files[0],'c')">
+    <div class="up-ico">📎</div>
+    <div class="up-txt">Excel da planilha Compartilhado</div>
+    <div class="up-sub">Colunas: CNPJ | Rede | Loja | UF | Endereço | Nº | Bairro | Cidade | CEP | Freq/Sem | Horas/Exe | Custo Hora</div>
+    <div class="up-badge" id="bC"></div>
+  </div>
+  <div class="field"><label>Ou cole (CNPJ | Rede | Loja | UF | Cidade | Freq/Sem | Horas/Exe | Custo Hora)</label>
+    <textarea id="f_rc" rows="3" placeholder="06.057.223/0446-24 | ASSAI | ASSAI ARARUAMA - RJ | RJ | ARARUAMA | 5 | 1 | 31.88"></textarea>
+  </div>
+
+  <div class="sl">📊 PDV Quality</div>
+  <div class="fr">
+    <div class="field"><label>Responsável PDV Quality</label><input type="text" id="f_pdv" placeholder="Felipe Ribeiro"></div>
+    <div class="field"><label>Nº da proposta</label><input type="text" id="f_num" placeholder="2026001"></div>
+  </div>
+  <div class="field"><label>Observações</label>
+    <textarea id="f_obs" rows="2">Todos os custos estão 100% provisionados, com exceção do vale-transporte que será cobrado à parte em nota fiscal.</textarea>
+  </div>
+  <button class="btn-g" style="width:100%;margin-top:8px;padding:10px" onclick="gerar()">▶ Gerar Proposta Completa</button>
+</div>
+
+<div class="preview" id="preview">
+  <div class="placeholder">
+    <div style="font-size:40px">📄</div>
+    <div style="font-size:14px;font-weight:600;color:var(--muted)">Preencha e clique em Gerar Proposta</div>
+    <div style="font-size:12px">Suporta múltiplos estados com formatos diferentes em cada um</div>
+  </div>
+</div>
+</div>
+
+<script>
+let lE=[], lC=[], estados=[], lastData={};
+let estadoCount = 0;
+
+const UFS = ['RJ','SP','MG','ES','BA','PR','RS','SC','GO','DF','PE','CE','AM','PA','MT','MS','RN','PB','AL','SE','PI','MA','TO','AC','RO','RR','AP'];
+
+// ── ESTADOS ──
+function addEstado(uf='RJ', fmt='cross', ep=14, el=120, ec=4834.88, cl=30, ch=656, cr=31.88) {
+  const id = ++estadoCount;
+  const div = document.createElement('div');
+  div.className = 'estado-bloco';
+  div.id = `eb_${id}`;
+  div.innerHTML = `
+    <div class="estado-header">
+      <span class="estado-title">Estado ${id}</span>
+      <button class="estado-remove" onclick="removeEstado(${id})" title="Remover">✕</button>
+    </div>
+    <div class="fr" style="margin-bottom:6px">
+      <div class="field"><label>UF</label>
+        <select id="uf_${id}">${UFS.map(u=>`<option${u===uf?' selected':''}>${u}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="modo-tog">
+      <button class="mb${fmt==='cross'?' active':''}" onclick="setFmt(${id},'cross')" id="mC_${id}">CrossTrade</button>
+      <button class="mb${fmt==='excl'?' active':''}" onclick="setFmt(${id},'excl')" id="mE_${id}">Exclusivo</button>
+      <button class="mb${fmt==='comp'?' active':''}" onclick="setFmt(${id},'comp')" id="mCo_${id}">Compartilhado</button>
+    </div>
+    <div class="sec-excl-b${fmt!=='comp'?' show':''}" id="sE_${id}">
+      <div class="fr">
+        <div class="field"><label>Qtd. promotores</label><input type="number" id="ep_${id}" value="${ep}" min="1" oninput="calcE(${id})"></div>
+        <div class="field"><label>Lojas exclusivas</label><input type="number" id="el_${id}" value="${el}" min="1"></div>
+      </div>
+      <div class="fr">
+        <div class="field"><label>Custo/colaborador (R$)</label><input type="number" id="ec_${id}" value="${ec}" step="0.01" oninput="calcE(${id})"></div>
+        <div class="field"><label>Total exclusivo</label><input type="number" id="et_${id}" readonly></div>
+      </div>
+    </div>
+    <div class="sec-comp-b${fmt!=='excl'?' show':''}" id="sCo_${id}">
+      <div class="fr">
+        <div class="field"><label>Lojas compartilhadas</label><input type="number" id="cl_${id}" value="${cl}" min="1"></div>
+        <div class="field"><label>Horas/mês</label><input type="number" id="ch_${id}" value="${ch}" min="1" oninput="calcC(${id})"></div>
+      </div>
+      <div class="fr">
+        <div class="field"><label>Custo hora (R$)</label><input type="number" id="cr_${id}" value="${cr}" step="0.01" oninput="calcC(${id})"></div>
+        <div class="field"><label>Total compartilhado</label><input type="number" id="ct_${id}" readonly></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('estadosWrap').appendChild(div);
+  estados.push({id, fmt});
+  calcE(id); calcC(id);
+}
+
+function removeEstado(id) {
+  document.getElementById(`eb_${id}`)?.remove();
+  estados = estados.filter(e=>e.id!==id);
+}
+
+function setFmt(id, fmt) {
+  ['cross','excl','comp'].forEach(f=>{
+    const el = document.getElementById(`m${f==='cross'?'C':f==='excl'?'E':'Co'}_${id}`);
+    if(el) el.classList.toggle('active', f===fmt);
+  });
+  document.getElementById(`sE_${id}`)?.classList.toggle('show', fmt!=='comp');
+  document.getElementById(`sCo_${id}`)?.classList.toggle('show', fmt!=='excl');
+  const e = estados.find(e=>e.id===id);
+  if(e) e.fmt = fmt;
+}
+
+function getFmt(id) {
+  const btns = ['cross','excl','comp'];
+  for(const f of btns) {
+    const key = f==='cross'?'C':f==='excl'?'E':'Co';
+    if(document.getElementById(`m${key}_${id}`)?.classList.contains('active')) return f;
+  }
+  return 'cross';
+}
+
+function calcE(id){
+  const p=parseFloat(document.getElementById(`ep_${id}`)?.value)||0;
+  const c=parseFloat(document.getElementById(`ec_${id}`)?.value)||0;
+  const el=document.getElementById(`et_${id}`);
+  if(el) el.value=(p*c).toFixed(2);
+}
+function calcC(id){
+  const h=parseFloat(document.getElementById(`ch_${id}`)?.value)||0;
+  const r=parseFloat(document.getElementById(`cr_${id}`)?.value)||0;
+  const el=document.getElementById(`ct_${id}`);
+  if(el) el.value=(h*r).toFixed(2);
+}
+
+// ── UPLOAD ──
+function handleFile(file, tipo) {
+  if(!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(ext==='xlsx'||ext==='xls') {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result,{type:'array'});
+      let sn = wb.SheetNames[0];
+      if(tipo==='e'){const s=wb.SheetNames.find(n=>n.toLowerCase().includes('excl'));if(s)sn=s;}
+      else{const s=wb.SheetNames.find(n=>n.toLowerCase().includes('compart'));if(s)sn=s;}
+      parseRows(XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''}), tipo, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => parseRows(e.target.result.split('\n').map(l=>l.split(/[,;|	]/)), tipo, file.name);
+    reader.readAsText(file,'UTF-8');
+  }
+}
+
+function parseRows(rows, tipo, fname) {
+  const data = [];
+  rows.forEach(row => {
+    const v = row.map(x=>String(x||'').trim());
+    if(v.every(x=>!x)) return;
+    if(tipo==='e') {
+      // Col B=PROMOTOR(1), C=CNPJ(2), D=END(3), E=NUM(4), F=BAIRRO(5), G=CIDADE(6), H=CEP(7), I=UF(8), J=REDE(9), K=LOJA(10), M-R=dias
+      let pr,cn,en,nu,ba,ci,ce,uf,re,lo,dias=[];
+      if(v.length>=11 && (v[0].toUpperCase().includes('PROMOTOR')||v[1]?.toUpperCase().includes('PROMOTOR'))){
+        const off = v[0]===''?1:0;
+        pr=v[off+0];cn=v[off+1];en=v[off+2];nu=v[off+3];ba=v[off+4];ci=v[off+5];ce=v[off+6];uf=v[off+7];re=v[off+8];lo=v[off+9];
+        // dias: cols M(11),N(12),O(13),P(14),Q(15),R(16) — offset
+        const dNames=['SEG','TER','QUA','QUI','SEX','SAB'];
+        for(let i=0;i<6;i++){if(v[off+10+i]&&v[off+10+i]!=='')dias.push(dNames[i]);}
+      } else {
+        // Formato manual: Promotor|CNPJ|End|Nº|Bairro|Cidade|CEP|UF|Rede|Loja|dias
+        [pr,cn,en,nu,ba,ci,ce,uf,re,lo]=v;
+        if(v[10]) dias=v[10].split(',').map(x=>x.trim().toUpperCase());
+      }
+      if(lo && !lo.toUpperCase().includes('LOJA') && !lo.toUpperCase().includes('PROMOTOR'))
+        data.push({promotor:pr||'',cnpj:cn||'',endereco:en||'',numero:nu||'',bairro:ba||'',cidade:ci||'',cep:ce||'',uf:uf||'',rede:re||'',loja:lo||'',dias});
+    } else {
+      // Compartilhado: B=CNPJ(0), C=REDE(1), D=LOJA(2), E=UF(3), F=END(4), G=NUM(5), H=BAIRRO(6), I=CIDADE(7), J=CEP(8), K=FREQ(9), M=HRS(11), O=CUSTO(13)
+      let cn,re,lo,uf,en,nu,ba,ci,ce,fr,hr,cu;
+      if(v.length>=10){
+        const off=v[0]===''?1:0;
+        cn=v[off+0];re=v[off+1];lo=v[off+2];uf=v[off+3];en=v[off+4];nu=v[off+5];ba=v[off+6];ci=v[off+7];ce=v[off+8];fr=v[off+9];hr=v[off+11]||v[off+10]||'1';cu=v[off+13]||v[off+12]||'31.88';
+      } else {
+        [cn,re,lo,uf,ci,fr,hr,cu]=v;
+      }
+      if(lo && !lo.toUpperCase().includes('LOJA') && !lo.toUpperCase().includes('REDE'))
+        data.push({cnpj:cn||'',rede:re||'',loja:lo||'',uf:uf||'',endereco:en||'',numero:nu||'',bairro:ba||'',cidade:ci||'',cep:ce||'',freq:fr||'5',horas_exe:hr||'1',custo_hora:parseFloat(cu)||31.88});
+    }
+  });
+  if(tipo==='e'){
+    lE=data;
+    const b=document.getElementById('bE');
+    b.textContent=`✓ ${data.length} lojas de "${fname}"`;
+    b.classList.add('show');
+    document.getElementById('f_re').value=data.map(d=>`${d.promotor}|${d.cnpj}|${d.endereco}|${d.numero}|${d.bairro}|${d.cidade}|${d.cep}|${d.uf}|${d.rede}|${d.loja}|${d.dias.join(',')}`).join('\n');
+  } else {
+    lC=data;
+    const b=document.getElementById('bC');
+    b.textContent=`✓ ${data.length} lojas de "${fname}"`;
+    b.classList.add('show');
+    document.getElementById('f_rc').value=data.map(d=>`${d.cnpj}|${d.rede}|${d.loja}|${d.uf}|${d.cidade}|${d.freq}|${d.horas_exe}|${d.custo_hora}`).join('\n');
+  }
+}
+
+function parseManual() {
+  const rE = document.getElementById('f_re').value.trim();
+  if(rE && lE.length===0) {
+    lE = rE.split('\n').filter(l=>l.trim()).map(l=>{
+      const p=l.split('|').map(x=>x.trim());
+      return{promotor:p[0]||'',cnpj:p[1]||'',endereco:p[2]||'',numero:p[3]||'',bairro:p[4]||'',cidade:p[5]||'',cep:p[6]||'',uf:p[7]||'',rede:p[8]||'',loja:p[9]||'',dias:(p[10]||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean)};
+    });
+  }
+  const rC = document.getElementById('f_rc').value.trim();
+  if(rC && lC.length===0) {
+    lC = rC.split('\n').filter(l=>l.trim()).map(l=>{
+      const p=l.split('|').map(x=>x.trim());
+      return{cnpj:p[0]||'',rede:p[1]||'',loja:p[2]||'',uf:p[3]||'',cidade:p[4]||'',freq:p[5]||'5',horas_exe:p[6]||'1',custo_hora:parseFloat(p[7])||31.88};
+    });
+  }
+}
+
+const fmt=(n)=>'R$ '+parseFloat(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN=(n)=>parseFloat(n||0).toLocaleString('pt-BR');
+
+const VANTS = {
+  excl:[
+    ['01','Equipe 100% Dedicada','Promotores focados exclusivamente na marca, garantindo maior atenção à execução, abastecimento e desenvolvimento das categorias.'],
+    ['02','Maior Controle Operacional','Visibilidade e controle sobre as atividades em campo, assegurando o cumprimento das estratégias definidas pela indústria.'],
+    ['03','Flexibilidade para Novas Lojas','Adicione ou substitua lojas ao longo do contrato, adequando a cobertura às necessidades e oportunidades do negócio.'],
+    ['04','Ajustes Rápidos de Roteiro','Operação reorientada conforme campanhas, lançamentos e sazonalidades, sem impactar outras marcas.'],
+    ['05','Melhor Execução no PDV','Maior frequência de visitas resulta em melhor abastecimento, redução de rupturas e maior presença da marca.'],
+    ['06','Aumento de Oportunidades','Equipe dedicada identifica ganhos de espaço, pontos extras, negociações e melhorias de exposição com agilidade.'],
+    ['07','Comunicação Direta e Rápida','Treinamentos e mudanças de estratégia são implementados de forma rápida e eficiente, mantendo toda a equipe alinhada.'],
+    ['08','Qualidade na Coleta de Dados','Relatórios, pesquisas de mercado e acompanhamento da concorrência coletados com mais profundidade e precisão.'],
+    ['09','Salas de Reunião Disponíveis','Espaço para treinamentos, alinhamentos estratégicos e reuniões do time da marca com a equipe de campo.'],
+    ['10','Estoque e Apoio Operacional','Armazenamento de materiais promocionais e de merchandising, reduzindo custos logísticos e agilizando ações.'],
+  ],
+  comp:[
+    ['01','Custo-Benefício Otimizado','Presença garantida em loja com custo ajustado à frequência e carga horária real necessária — sem exigir dedicação exclusiva do promotor.'],
+    ['02','Limitação de Marcas','Promotor compartilhado atende número limitado de marcas por visita, mantendo foco e qualidade na execução.'],
+    ['03','Treinamentos Mensais','Capacitação periódica com atualização sobre produtos, estratégias e materiais de merchandising da marca.'],
+    ['04','Liderança de Campo','Supervisor acompanha as visitas, garante a qualidade da execução e reporta diretamente para a indústria.'],
+    ['05','Relatórios Gerenciais','Relatórios com fotos, ruptura, share de gôndola e sell-out por loja e período para tomada de decisão ágil.'],
+    ['06','Gestão Indireta Completa','A PDV Quality gerencia escala, reposição de ausências, treinamento e monitoramento de indicadores.'],
+    ['07','Dashboard Power BI','Painel de dados em tempo real com indicadores de execução, assiduidade e performance por rede e UF.'],
+    ['08','Blitz Operacional','Ações intensivas para lançamentos, datas sazonais ou correção de execução em lojas prioritárias.'],
+  ],
+  cross:[
+    ['01','Equipe Dedicada + Cobertura Ampla','Combine o poder da equipe exclusiva nos canais A com presença compartilhada nas regiões de menor volume.'],
+    ['02','Máxima Cobertura Nacional','Combinação de atendimento exclusivo e compartilhado conforme o perfil de cada loja, ampliando a presença total da marca.'],
+    ['03','Flexibilidade Total','Ajuste de lojas exclusivas e compartilhadas conforme sazonalidades, lançamentos e mudanças de estratégia.'],
+    ['04','Execução Superior nos Canais A','Promotores exclusivos nos maiores canais garantem frequência ideal, abastecimento perfeito e execução de alto nível.'],
+    ['05','Cobertura Ampla e Consistente','Promotores compartilhados mantêm visibilidade e execução de qualidade no restante da rede, com custo proporcional e controlado.'],
+    ['06','Dashboard Unificado em Tempo Real','Todos os canais e UFs em um único painel Power BI com dados de execução, ruptura e sell-out consolidados.'],
+  ]
+};
+
+// ── GERAR PROPOSTA ──
+function gerar() {
+  if(lE.length===0||lC.length===0) parseManual();
+  const marca  = document.getElementById('f_marca').value||'MARCA DO CLIENTE';
+  const slogan = document.getElementById('f_slogan').value||'Mais Presença, Mais Resultados!';
+  const resp   = document.getElementById('f_resp').value||'—';
+  const cor1   = document.getElementById('f_c1').value;
+  const cor2   = document.getElementById('f_c2').value;
+  const pdvR   = document.getElementById('f_pdv').value||'Felipe Ribeiro';
+  const numP   = document.getElementById('f_num').value||(new Date().getFullYear()+'001');
+  const obs    = document.getElementById('f_obs').value;
+  const today  = new Date().toLocaleDateString('pt-BR');
+  const val30  = new Date(Date.now()+30*24*60*60*1000).toLocaleDateString('pt-BR');
+
+  // Coleta dados de cada estado
+  const uf_list = [];
+  document.querySelectorAll('.estado-bloco').forEach(bloco => {
+    const id = bloco.id.replace('eb_','');
+    const uf    = document.getElementById(`uf_${id}`)?.value||'RJ';
+    const f_    = getFmt(parseInt(id));
+    const ep    = parseFloat(document.getElementById(`ep_${id}`)?.value)||0;
+    const el_   = parseFloat(document.getElementById(`el_${id}`)?.value)||0;
+    const ec    = parseFloat(document.getElementById(`ec_${id}`)?.value)||0;
+    const cl_   = parseFloat(document.getElementById(`cl_${id}`)?.value)||0;
+    const ch    = parseFloat(document.getElementById(`ch_${id}`)?.value)||0;
+    const cr    = parseFloat(document.getElementById(`cr_${id}`)?.value)||0;
+    uf_list.push({uf,formato:f_,exPromo:ep,exLojas:el_,exCusto:ec,exTotal:ep*ec,cpLojas:cl_,cpHoras:ch,cpHora:cr,cpTotal:ch*cr});
+  });
+
+  if(uf_list.length===0){alert('Adicione pelo menos um estado.');return;}
+
+  let totalGeral=0;
+  let blocosProp='';
+  const ufsUsadas = [...new Set(uf_list.map(u=>u.uf))].join(', ');
+
+  uf_list.forEach(({uf,formato,exPromo,exLojas,exCusto,exTotal,cpLojas,cpHoras,cpHora,cpTotal})=>{
+    totalGeral += (formato==='excl'?exTotal:formato==='comp'?cpTotal:exTotal+cpTotal);
+
+    const cardExcl=(formato==='cross'||formato==='excl')?`
+      <div class="op-card">
+        <div class="op-bar" style="background:linear-gradient(90deg,#C0392B,#E74C3C)"></div>
+        <div class="op-badge e">🔴 Exclusivo — Equipe Dedicada</div>
+        <div class="op-title">Atendimento Exclusivo</div>
+        <div class="op-stats">
+          <div class="op-stat"><span class="osl">Qtd. colaboradores</span><span class="osv">${exPromo}</span></div>
+          <div class="op-stat"><span class="osl">Lojas exclusivas</span><span class="osv">${fmtN(exLojas)}</span></div>
+          <div class="op-stat"><span class="osl">Custo/colaborador</span><span class="osv">${fmt(exCusto)}</span></div>
+          <div class="op-stat hl"><span class="osl b">Custo Operação Exclusiva</span><span class="osv r">${fmt(exTotal)}</span></div>
+        </div>
+      </div>`:'';
+
+    const cardComp=(formato==='cross'||formato==='comp')?`
+      <div class="op-card">
+        <div class="op-bar" style="background:linear-gradient(90deg,${cor1},${cor2})"></div>
+        <div class="op-badge c">🟡 Compartilhado</div>
+        <div class="op-title">Atendimento Compartilhado</div>
+        <div class="op-stats">
+          <div class="op-stat"><span class="osl">Lojas atendidas</span><span class="osv">${fmtN(cpLojas)}</span></div>
+          <div class="op-stat"><span class="osl">Horas por mês</span><span class="osv">${fmtN(cpHoras)}</span></div>
+          <div class="op-stat"><span class="osl">Custo hora</span><span class="osv">${fmt(cpHora)}</span></div>
+          <div class="op-stat hla"><span class="osl ba">Custo Operação Compartilhada</span><span class="osv a">${fmt(cpTotal)}</span></div>
+        </div>
+      </div>`:'';
+
+    blocosProp+=`
+      <div class="estado-prop">
+        <div class="estado-prop-hdr">
+          <span class="estado-prop-uf">📍 ${uf}</span>
+          <span class="estado-prop-fmt">${formato==='cross'?'CrossTrade':formato==='excl'?'Exclusivo':'Compartilhado'}</span>
+        </div>
+        <div class="op-grid ${formato==='cross'?'dois':'um'}">${cardExcl}${cardComp}</div>
+      </div>`;
+  });
+
+  // Vantagens — usa o formato do primeiro estado; se cross usa cross
+  const fmt0 = uf_list[0]?.formato||'cross';
+  const vants = VANTS[fmt0]||VANTS.cross;
+  const vLabel = fmt0==='excl'?'✅ Vantagens do Atendimento Exclusivo':fmt0==='comp'?'✅ Vantagens do Atendimento Compartilhado':'✅ Vantagens do Formato CrossTrade';
+
+  const tabExcl = lE.length>0?`
+    <div class="tab-card">
+      <div class="tab-hdr"><div class="tab-hdr-t">📍 Roteiro — Lojas Exclusivas</div><div class="tab-hdr-b">${lE.length} lojas</div></div>
+      <div class="tab-wrap"><table class="lj">
+        <thead><tr><th>Promotor</th><th>UF</th><th>Rede</th><th>Loja</th><th>SEG</th><th>TER</th><th>QUA</th><th>QUI</th><th>SEX</th><th>SAB</th></tr></thead>
+        <tbody>${lE.map(l=>`<tr><td>${l.promotor}</td><td>${l.uf}</td><td class="s">${l.rede}</td><td class="s">${l.loja}</td>${['SEG','TER','QUA','QUI','SEX','SAB'].map(d=>`<td style="text-align:center;color:${l.dias.includes(d)?'var(--red)':'var(--faint)'}">${l.dias.includes(d)?'✕':'·'}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table></div>
+    </div>`:''
+
+  const tabComp = lC.length>0?`
+    <div class="tab-card">
+      <div class="tab-hdr"><div class="tab-hdr-t">🏪 Roteiro — Lojas Compartilhadas</div><div class="tab-hdr-b">${lC.length} lojas</div></div>
+      <div class="tab-wrap"><table class="lj">
+        <thead><tr><th>Rede</th><th>Loja</th><th>UF</th><th>Cidade</th><th>Freq/Sem</th><th>Horas/Mês</th><th>Custo Hora</th></tr></thead>
+        <tbody>${lC.map(l=>`<tr><td class="s">${l.rede}</td><td class="s">${l.loja}</td><td>${l.uf}</td><td>${l.cidade||''}</td><td>${l.freq}</td><td>${parseFloat(l.freq||5)*4*parseFloat(l.horas_exe||1)}</td><td>${fmt(l.custo_hora)}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>`:''
+
+  document.getElementById('preview').innerHTML=`
+  <div class="proposta">
+    <div class="prop-capa" style="background:${cor1}">
+      <div class="capa-bar" style="background:linear-gradient(90deg,${cor2},rgba(255,255,255,.3))"></div>
+      <div class="capa-top">
+        <div>
+          <div class="marca-label">Proposta de Atendimento</div>
+          <div class="marca-nome">${marca}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:5px;font-style:italic">${slogan}</div>
+        </div>
+        <div class="pdv-side">
+          <img src="https://pdvquality.com/wp-content/uploads/2025/10/PDVQ-Branco-1-1024x353.png" class="pdv-logo-img" alt="PDV Quality"
+               onerror="this.outerHTML='<div style=\\'font-family:serif;font-size:16px;color:white\\'>PDV Quality</div>'">
+          <div class="pdv-tag">Visibilidade que Gera Resultado</div>
+        </div>
+      </div>
+      <div class="capa-div"></div>
+      <div class="capa-meta">
+        <div class="meta-item"><strong>${resp}</strong>Responsável</div>
+        <div class="meta-item"><strong>${ufsUsadas}</strong>Estado(s)</div>
+        <div class="meta-item"><strong>${today}</strong>Data de envio</div>
+        <div class="meta-item"><strong>${numP}</strong>Nº proposta</div>
+        <div class="meta-item"><strong>${pdvR}</strong>Executivo PDV Quality</div>
+      </div>
+    </div>
+
+    ${blocosProp}
+
+    <div class="total-geral">
+      <div>
+        <div class="tg-l">Total Geral da Operação</div>
+        <div class="tg-s">Investimento mensal recorrente · ${ufsUsadas}</div>
+        <div class="tg-v">${fmt(totalGeral)}</div>
+        <div class="tg-p">por mês</div>
+      </div>
+      <div class="tg-r">
+        ${uf_list.map(u=>`<div><div class="tg-rl">${u.uf} — ${u.formato==='excl'?'Exclusivo':u.formato==='comp'?'Compartilhado':'CrossTrade'}</div><div class="tg-rv">${fmt(u.formato==='excl'?u.exTotal:u.formato==='comp'?u.cpTotal:u.exTotal+u.cpTotal)}</div></div>`).join('')}
+        <div><div class="tg-rl">Válido até</div><div class="tg-rv">${val30}</div></div>
+      </div>
+    </div>
+
+    <div class="vant-wrap">
+      <div class="vant-sec-title">${vLabel}</div>
+      <div class="vant-grid">${vants.map(([n,t,d])=>`<div class="vant-card"><div class="vant-n">${n}</div><div class="vant-t" contenteditable="true" title="Clique para editar">${t}</div><div class="vant-d" contenteditable="true" title="Clique para editar">${d}</div></div>`).join('')}</div>
+      <div style="font-size:10px;color:var(--faint);margin-top:4px">💡 Clique em qualquer título ou texto de vantagem acima para editar diretamente.</div>
+    </div>
+
+    ${tabExcl}
+    ${tabComp}
+
+    <div class="prop-footer">
+      <div class="fo"><strong>⚠️ Observações:</strong> ${obs}</div>
+      <div class="fv"><span>Válida até</span><strong>${val30}</strong><div style="margin-top:3px;font-size:10px;color:var(--faint)">PDV Quality · Todos os direitos reservados</div></div>
+    </div>
+  </div>`;
+
+  document.getElementById('preview').scrollTop=0;
+  document.getElementById('btnXL').classList.add('show');
+
+  // Salva para Excel
+  lastData={marca,resp,numProp:numP,pdvResp:pdvR,obs,uf_list,lojasExcl:[...lE],lojasComp:[...lC]};
+  lE=[]; lC=[];
+}
+
+// ── EXCEL FIEL AO ORIGINAL — via Python ──
+async function downloadExcel(){
+  if(!lastData.marca){alert('Gere a proposta primeiro.');return;}
+  const btn=document.getElementById('btnXL');
+  const orig=btn.textContent;
+  btn.textContent='⏳ Gerando...'; btn.disabled=true;
+
+  try {
+    const payload=JSON.stringify(lastData);
+    const resp=await fetch('/api/excel',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:payload
+    });
+    if(resp.ok){
+      const blob=await resp.blob();
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`Orcamento_PDVQuality_${lastData.marca.replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`;
+      a.click(); URL.revokeObjectURL(url);
+    } else {
+      // Fallback: XLSX.js simples com estrutura correta
+      downloadExcelFallback();
+    }
+  } catch(e) {
+    // Sem servidor — usa fallback JS
+    downloadExcelFallback();
+  }
+  btn.textContent=orig; btn.disabled=false;
+}
+
+function downloadExcelFallback(){
+  const d=lastData;
+  const wb=XLSX.utils.book_new();
+
+  // ─ RESUMO ─
+  const resumo=[
+    ['','','INFORMAÇÕES DE ORÇAMENTO'],[''],
+    ['','','INDÚSTRIA:',d.marca,'','PROPOSTA:',d.numProp],
+    ['','','CNPJ:','-','','DATA DE ENVIO:',new Date().toLocaleDateString('pt-BR')],
+    ['','','RESPONSÁVEL:',d.resp],['','','TELEFONE:',''],
+    ['','','RESPONSÁVEL PDV QUALITY:',d.pdvResp],[''],
+  ];
+  (d.uf_list||[]).forEach(u=>{
+    resumo.push(['','',`UF: ${u.uf}  |  FORMATO: ${u.formato.toUpperCase()}`]);
+    const fmt_=u.formato||'cross';
+    if(fmt_==='cross'||fmt_==='comp'){
+      resumo.push(['','','COMPARTILHADO']);
+      resumo.push(['','','QUANTIDADE DE LOJAS:','','','','',u.cpLojas||0]);
+      resumo.push(['','','QUANTIDADE DE HORAS POR MÊS','','','','',u.cpHoras||0]);
+      resumo.push(['','','CUSTO HORA MÉDIA','','','','',u.cpHora||0]);
+      resumo.push(['','','CUSTO ADICIONAL:','','','','',0]);
+      resumo.push(['','','TOTAL:','','','','',u.cpTotal||0]);
+      resumo.push(['']);
+    }
+    if(fmt_==='cross'||fmt_==='excl'){
+      resumo.push(['','','EXCLUSIVO']);
+      resumo.push(['','','QUANTIDADE DE COLABORADORES','','','','',u.exPromo||0]);
+      resumo.push(['','','CUSTO DO COLABORADOR','','','','',u.exCusto||0]);
+      resumo.push(['','','QUANTD DE LOJAS','','','','',u.exLojas||0]);
+      resumo.push(['','','TOTAL:','','','','',u.exTotal||0]);
+      resumo.push(['']);
+    }
+  });
+  const tg=(d.uf_list||[]).reduce((a,u)=>a+(u.formato==='excl'?u.exTotal:u.formato==='comp'?u.cpTotal:(u.exTotal||0)+(u.cpTotal||0)),0);
+  resumo.push(['','','','','','','',tg]);
+  resumo.push(['']);
+  resumo.push(['','',`* ${d.obs}  —  Orçamento válido por 30 dias`]);
+  const wsR=XLSX.utils.aoa_to_sheet(resumo);
+  wsR['!cols']=[{wch:3},{wch:3},{wch:32},{wch:22},{wch:5},{wch:16},{wch:14},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumo');
+
+  // ─ EXCLUSIVO — estrutura fiel ao original ─
+  if(d.lojasExcl&&d.lojasExcl.length>0){
+    const rows_e=[
+      [],[],[],[],[],[],[],[],  // linhas 1-8 em branco
+      ['','PROMOTOR','CNPJ','ENDEREÇO','NUMERO','BAIRRO','CIDADE','CEP','UF ','REDE','LOJA',
+       'FREQ SEMANAL ','SEG','TER','QUA','QUI','SEx','SÁB','',
+       'TOTAL PROMOTORES  EXCLUSIVOS','TOTAL DE LOJAS','MÉDIA DE LOJAS POR SETOR','',
+       'TOTAL DE  LOJAS COMPARTILHADO'],
+    ];
+    const nPromo=[...new Set(d.lojasExcl.map(x=>x.promotor))].length;
+    d.lojasExcl.forEach((l,i)=>{
+      const dias=l.dias||[];
+      rows_e.push([
+        '',l.promotor||'',l.cnpj||'',l.endereco||'',l.numero||'',l.bairro||'',
+        l.cidade||'',l.cep||'',l.uf||'',l.rede||'',l.loja||'',
+        dias.length,
+        dias.includes('SEG')?'x':'', dias.includes('TER')?'x':'',
+        dias.includes('QUA')?'x':'', dias.includes('QUI')?'x':'',
+        dias.includes('SEX')?'x':'', dias.includes('SAB')?'x':'',
+        '',
+        i===0?nPromo:'',
+        i===0?d.lojasExcl.length:'',
+        i===0?(d.lojasExcl.length/nPromo).toFixed(1):'','',
+        i===0?(d.lojasComp||[]).length:''
+      ]);
+    });
+    const wsE=XLSX.utils.aoa_to_sheet(rows_e);
+    wsE['!cols']=[{wch:2.6},{wch:26},{wch:26},{wch:52},{wch:8},{wch:31},{wch:25},{wch:10},
+                 {wch:11},{wch:25},{wch:69},{wch:20},{wch:13},{wch:13},{wch:13},{wch:12},
+                 {wch:13},{wch:10},{wch:7},{wch:19},{wch:12},{wch:17},{wch:2.5},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,wsE,'Exclusivo');
+  }
+
+  // ─ COMPARTILHADO — estrutura fiel ao original ─
+  if(d.lojasComp&&d.lojasComp.length>0){
+    const rows_c=[
+      [],[],[],[],[],[],  // linhas 1-6 em branco
+      ['','CNPJ','REDE','LOJA','UF ','ENDEREÇO','NUMERO','BAIRRO','CIDADE','CEP',
+       'FREQ SEMANAL','FREQ MENSAL','HORAS DE EXE','HORAS MENSAIS','CUSTO HORA','CUSTO LOJA'],
+    ];
+    d.lojasComp.forEach(l=>{
+      const fr=parseFloat(l.freq)||5;
+      const frm=fr*4;
+      const he=parseFloat(l.horas_exe)||1;
+      const hm=frm*he;
+      const cu=parseFloat(l.custo_hora)||31.88;
+      rows_c.push([
+        '',l.cnpj||'',l.rede||'',l.loja||'',l.uf||'',l.endereco||'',l.numero||'',
+        l.bairro||'',l.cidade||'',l.cep||'',
+        fr,frm,he,hm,cu,parseFloat((cu*hm).toFixed(2))
+      ]);
+    });
+    const totComp=d.lojasComp.reduce((a,l)=>{
+      const fr=parseFloat(l.freq)||5,he=parseFloat(l.horas_exe)||1,cu=parseFloat(l.custo_hora)||31.88;
+      return a+(fr*4*he*cu);
+    },0);
+    rows_c.push(['','TOTAL COMPARTILHADO:','','','','','','','','','','','','','',parseFloat(totComp.toFixed(2))]);
+    const wsC=XLSX.utils.aoa_to_sheet(rows_c);
+    wsC['!cols']=[{wch:2.4},{wch:18},{wch:17},{wch:53},{wch:3.3},{wch:44},{wch:14},{wch:29},
+                 {wch:25},{wch:10},{wch:20},{wch:10},{wch:18},{wch:10},{wch:14},{wch:17}];
+    XLSX.utils.book_append_sheet(wb,wsC,'Compartilhado');
+  }
+
+  const fname=`Orcamento_PDVQuality_${d.marca.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`;
+  XLSX.writeFile(wb,fname);
+}
+
+// ── INIT ──
+addEstado();
+
+function printPropostaOnly() {
+  // Identificar a seção de proposta/preview
+  const outputEls = document.querySelectorAll('[id*="proposta"],[id*="preview"],[id*="output"],[class*="proposta"],[class*="preview"],[class*="output"]');
+  
+  if (outputEls.length > 0) {
+    // Tem elemento de preview — imprimir só ele
+    document.body.classList.add('print-proposta-only');
+    window.print();
+    document.body.classList.remove('print-proposta-only');
+  } else {
+    // Fallback: abrir em nova janela com só o conteúdo gerado
+    const content = document.body.innerHTML;
+    const w = window.open('', '_blank');
+    w.document.write('<html><head><title>Proposta PDV Quality</title></head><body>' + content + '</body></html>');
+    w.document.close();
+    w.print();
+  }
+}
+
+// ── CONTADOR AUTOMÁTICO DE PROPOSTAS ──
+// Lê o próximo número do Firestore, preenche o campo e incrementa ao gerar
+(async function initContadorProposta() {
+  const API_KEY = 'AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q';
+  const PROJECT = 'painel-pdv-quality';
+  const DOC_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/meta/contador_propostas?key=${API_KEY}`;
+
+  async function lerContador() {
+    try {
+      const r = await fetch(DOC_URL);
+      if (!r.ok) return 1;
+      const j = await r.json();
+      return parseInt(j.fields?.proximo?.integerValue || 1);
+    } catch(e) { return 1; }
+  }
+
+  async function incrementarContador(proximo) {
+    try {
+      await fetch(DOC_URL, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { proximo: { integerValue: String(proximo + 1) } } })
+      });
+    } catch(e) {}
+  }
+
+  const proximo = await lerContador();
+  const ano = new Date().getFullYear();
+  const numFormatado = `${ano}${String(proximo).padStart(3,'0')}`;
+  const campo = document.getElementById('f_num');
+  if (campo && !campo.value) campo.value = numFormatado;
+
+  // Incrementa o contador ao clicar em gerar/imprimir
+  document.querySelectorAll('button').forEach(btn => {
+    if (/gerar|imprimir|proposta|pdf/i.test(btn.textContent)) {
+      btn.addEventListener('click', () => {
+        if (campo?.value === numFormatado) incrementarContador(proximo);
+      }, { once: true });
+    }
+  });
+})();
+
+</script>
+</body>
+</html>

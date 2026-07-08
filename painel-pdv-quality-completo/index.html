@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDV Quality — Painel Comercial</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0D1B2A;--gold:#C9A84C;--gold2:#E8C97A;--bg:#F0F3F8;--border:#DDE3EE;--muted:#64748B;}
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;background:var(--bg)}
+
+/* TOPBAR */
+.bar{background:var(--navy);height:52px;display:flex;align-items:center;padding:0 16px;gap:8px;flex-shrink:0;border-bottom:2px solid var(--gold)}
+.logo{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:8px}
+.logo img{height:22px;object-fit:contain}
+.logo-fb{font-family:'DM Serif Display',serif;font-size:14px;color:white;display:none}
+.logo-tag{font-size:10px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;border-left:1px solid rgba(255,255,255,.2);padding-left:8px}
+.nav{display:flex;gap:2px;flex:1;overflow-x:auto}
+.nav::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.4);background:transparent;border:none;white-space:nowrap;transition:all .15s}
+.tab::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--c);flex-shrink:0}
+.tab:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)}
+.tab.active{background:rgba(255,255,255,.11);color:white}
+
+/* CONTEÚDO */
+.content{flex:1;position:relative;overflow:hidden}
+.page{display:none;position:absolute;inset:0}
+.page.active{display:block}
+.page.plan-page.active{display:flex;flex-direction:column}
+
+/* IFRAME */
+.tool-frame{width:100%;height:100%;border:none;display:block}
+
+/* HOME */
+.home{width:100%;height:100%;overflow-y:auto;background:var(--bg);padding:28px 20px 60px}
+.hw{max-width:840px;margin:0 auto}
+.h1{font-family:'DM Serif Display',serif;font-size:26px;color:#0D1B2A;margin-bottom:4px}
+.h1 em{color:var(--gold);font-style:italic}
+.hsub{font-size:13px;color:var(--muted);margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.card{background:white;border:1.5px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.card:hover{border-color:var(--gold);box-shadow:0 4px 14px rgba(0,0,0,.07);transform:translateY(-2px)}
+.card-stripe{position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0}
+.card-ico{font-size:24px;margin-bottom:8px}
+.card-t{font-size:13px;font-weight:700;color:#0D1B2A;margin-bottom:3px}
+.card-d{font-size:11px;color:var(--muted);line-height:1.5}
+.card-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;margin-top:6px}
+.meta{background:#0D1B2A;border-radius:12px;padding:16px 20px;display:grid;grid-template-columns:repeat(4,1fr)}
+.mi{padding:0 14px;border-right:1px solid rgba(255,255,255,.08)}
+.mi:first-child{padding-left:0}
+.mi:last-child{border:none}
+.mi-l{font-size:10px;color:rgba(255,255,255,.3);margin-bottom:2px}
+.mi-v{font-family:'DM Serif Display',serif;font-size:20px;color:white}
+.mi-s{font-size:10px;color:rgba(255,255,255,.25);margin-top:1px}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo">
+    <img src="https://pdvquality.com/wp-content/uploads/2025/10/PDVQ-Branco-1-1024x353.png" alt="PDV Quality"
+         onerror="this.style.display='none';document.getElementById('lfb').style.display='block'">
+    <span id="lfb" class="logo-fb">PDV Quality</span>
+    <span class="logo-tag">Painel Comercial</span>
+  </div>
+  <nav class="nav">
+<button class="tab active" id="t-home" onclick="show('home')" style="--c:#C9A84C">Início</button>
+<button class="tab" id="t-dash" onclick="show('dash')" style="--c:#1B4F8A">Relatório</button>
+<button class="tab" id="t-calc" onclick="show('calc')" style="--c:#B45309">Decupagem</button>
+<button class="tab" id="t-prop" onclick="show('prop')" style="--c:#7C3AED">Proposta</button>
+<button class="tab" id="t-plan" onclick="show('plan')" style="--c:#EA580C">Planejamento</button>
+<button class="tab" id="t-rot" onclick="show('rot')" style="--c:#1A7A4A">Gerador de Roteiro</button>
+<button class="tab" id="t-fech" onclick="show('fech')" style="--c:#1A7A4A">Fechamento</button>
+<button class="tab" id="t-prosp" onclick="show('prosp')" style="--c:#8B5CF6">Prospecção</button>
+<button class="tab" id="t-contr" onclick="show('contr')" style="--c:#0EA5E9">Contratos</button>
+  </nav>
+</div>
+
+<div class="content">
+
+  <!-- HOME -->
+  <div class="page active" id="p-home">
+    <div class="home">
+    <div class="hw">
+      <div class="h1">Painel Comercial <em>PDV Quality</em></div>
+      <div class="hsub">Felipe Ribeiro — Head de Novos Negócios</div>
+      <div class="grid">
+        <div class="card" onclick="show('dash')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#1B4F8A,#3B82F6)"></div>
+          <div class="card-ico">📊</div><div class="card-t">Relatório Semanal</div>
+          <div class="card-d">Funil da semana, pipeline e destaques para o CEO.</div>
+          <div class="card-tag" style="background:#EFF6FF;color:#1D4ED8">Atualizado às 7h</div>
+        </div>
+        <div class="card" onclick="show('rot')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#1A7A4A,#22C55E)"></div>
+          <div class="card-ico">🗺️</div><div class="card-t">Gerador de Roteiro</div>
+          <div class="card-d">Monte o roteiro semanal por loja: importe em Excel ou use a base PDV Quality, com sequência geográfica otimizada.</div>
+          <div class="card-tag" style="background:#DCFCE7;color:#1A7A4A">Por promotor</div>
+        </div>
+        <div class="card" onclick="show('calc')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#B45309,#F59E0B)"></div>
+          <div class="card-ico">🧮</div><div class="card-t">Calculadora de Decupagem</div>
+          <div class="card-d">Spread em tempo real. Encargos editáveis. Simples Nacional e Lucro Real.</div>
+          <div class="card-tag" style="background:#FEF3C7;color:#B45309">Custo base R$ 4.834</div>
+        </div>
+        <div class="card" onclick="show('prop')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#7C3AED,#A78BFA)"></div>
+          <div class="card-ico">📄</div><div class="card-t">Gerador de Proposta</div>
+          <div class="card-d">Proposta completa com identidade da marca, múltiplos estados e roteiro.</div>
+          <div class="card-tag" style="background:#F3E8FF;color:#7C3AED">CrossTrade · Exclusivo · Compartilhado</div>
+        </div>
+        <div class="card" onclick="show('plan')">
+          <div class="card-ico">📅</div><div class="card-t">Planejamento</div>
+          <div class="card-d">Tarefas da semana com checklist interativo.</div>
+        </div>
+        <div class="card" onclick="show('fech')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#0B2415,#1A7A4A)"></div>
+          <div class="card-ico">📊</div><div class="card-t">Fechamento do Mês</div>
+          <div class="card-d">Contratos fechados, funil mensal e resultados para apresentação ao CEO.</div>
+          <div class="card-tag" style="background:#DCFCE7;color:#1A7A4A">Exportar PDF</div>
+        </div>
+        <div class="card" onclick="show('prosp')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#3B1E6D,#8B5CF6)"></div>
+          <div class="card-ico">🎯</div><div class="card-t">Prospecção</div>
+          <div class="card-d">Leads capturados via Lusha, fila de aprovação e envio automático de e-mail.</div>
+          <div class="card-tag" style="background:#EDE9FE;color:#6D28D9">Fila de aprovação</div>
+        </div>
+        <div class="card" onclick="show('contr')">
+          <div class="card-stripe" style="background:linear-gradient(90deg,#0C4A6E,#0EA5E9)"></div>
+          <div class="card-ico">📄</div><div class="card-t">Contratos</div>
+          <div class="card-d">Importe modelos .docx, preencha os campos detectados automaticamente e gere o contrato.</div>
+          <div class="card-tag" style="background:#E0F2FE;color:#0369A1">Importar modelo</div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- IFRAMES DAS FERRAMENTAS -->
+<div class="page" id="p-dash"><iframe id="f-dash" class="tool-frame" src="/relatorio.html" frameborder="0" allowfullscreen></iframe></div>
+<div class="page" id="p-calc"><iframe id="f-calc" class="tool-frame" src="/calculadora.html" frameborder="0" allowfullscreen></iframe></div>
+<div class="page" id="p-prop"><iframe id="f-prop" class="tool-frame" src="/proposta.html" frameborder="0" allowfullscreen></iframe></div>
+<div class="page" id="p-rot"><iframe id="f-rot" class="tool-frame" src="/roteirizador.html" frameborder="0" allowfullscreen></iframe></div>
+
+
+<div class="page plan-page" id="p-plan" style="padding:1.5rem;overflow:hidden">
+
+<style>
+.plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem;flex-shrink:0}
+.plan-title{font-size:1.3rem;font-weight:700;color:#1a1a1a}
+.plan-semana{font-size:.85rem;color:#888;margin-top:2px}
+.plan-progress{display:flex;align-items:center;gap:.75rem}
+.plan-bar-wrap{width:140px;height:7px;background:#eee;border-radius:99px;overflow:hidden}
+.plan-bar{height:100%;background:#EA580C;border-radius:99px;transition:width .4s}
+.plan-pct{font-size:.85rem;font-weight:600;color:#EA580C;min-width:34px;text-align:right}
+.plan-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;flex:1;min-height:0;overflow-x:auto}
+.plan-col{display:flex;flex-direction:column;background:#f7f6f4;border-radius:12px;min-width:0;overflow:hidden}
+.plan-col-head{padding:10px 12px 8px;border-bottom:1px solid #eee;flex-shrink:0}
+.plan-col-day{font-weight:700;font-size:.82rem;color:#1a1a1a}
+.plan-col-date{font-size:.72rem;color:#999;margin-top:1px}
+.plan-col-count{font-size:.7rem;color:#aaa;margin-top:3px}
+.plan-col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;min-height:60px}
+.plan-col-body.drag-over{background:#fff3ec}
+.plan-task{background:#fff;border:1px solid #eee;border-radius:9px;padding:8px 9px;cursor:grab;transition:opacity .2s,box-shadow .15s;user-select:none}
+.plan-task:hover{box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.plan-task:active{cursor:grabbing}
+.plan-task.dragging{opacity:.35}
+.plan-task.done{background:#f3fbf5;border-color:#cdeed8}
+.plan-task.done .plan-task-text{text-decoration:line-through;color:#aaa}
+.plan-task-row1{display:flex;align-items:flex-start;gap:6px}
+.plan-drag-handle{color:#ccc;font-size:13px;cursor:grab;flex-shrink:0;margin-top:2px;line-height:1;user-select:none}
+.plan-drag-handle:hover{color:#EA580C}
+.plan-cb{width:17px;height:17px;border-radius:5px;border:2px solid #ddd;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;cursor:pointer;transition:all .15s}
+.plan-task.done .plan-cb{background:#22c55e;border-color:#22c55e}
+.plan-cb-check{display:none;color:#fff;font-size:10px;font-weight:700}
+.plan-task.done .plan-cb-check{display:block}
+.plan-task-text{flex:1;font-size:.78rem;line-height:1.35;color:#333;outline:none;border-radius:3px;cursor:text;min-width:20px}
+.plan-task-text:focus{background:#fffbe8;box-shadow:0 0 0 2px #EA580C30}
+.plan-task.done .plan-task-text{pointer-events:none}
+.plan-rm{background:none;border:none;color:#ddd;cursor:pointer;font-size:11px;flex-shrink:0;padding:1px 2px;line-height:1}
+.plan-rm:hover{color:#f87171}
+.plan-task-foot{display:flex;align-items:center;gap:4px;margin-top:6px;margin-left:23px;flex-wrap:wrap}
+.plan-tipo{font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:99px}
+.tp-prop{background:#fff7ed;color:#c2410c}
+.tp-reun{background:#eff6ff;color:#1d4ed8}
+.tp-pros{background:#f0fdf4;color:#15803d}
+.tp-prod{background:#faf5ff;color:#7e22ce}
+.tp-vis{background:#f5f5f4;color:#57534e}
+.plan-badge{font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:99px}
+.b-hot{background:#fee2e2;color:#991b1b}
+.b-new{background:#dcfce7;color:#166534}
+.b-conf{background:#dbeafe;color:#1e40af}
+.b-empty{background:#F1F5F9;color:#94A3B8;opacity:.6}
+.plan-tipo:hover,.plan-badge:hover{opacity:.75;outline:1.5px dashed currentColor}
+.plan-add-btn{display:flex;align-items:center;justify-content:center;gap:5px;font-size:.74rem;color:#b0653a;background:none;border:none;cursor:pointer;padding:7px;margin:2px 6px 8px;border-radius:7px;flex-shrink:0}
+.plan-add-btn:hover{background:#fff3ec;color:#EA580C}
+.plan-ceo-section{margin-top:.9rem;padding-top:.8rem;border-top:1px solid #e5e5e5;flex-shrink:0}
+.plan-ceo-title{font-size:.75rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
+.plan-ceo-box{width:100%;min-height:56px;border:1.5px solid #e5e5e5;border-radius:10px;padding:.6rem .8rem;font-size:.85rem;color:#333;font-family:inherit;resize:vertical;outline:none;transition:border .2s;box-sizing:border-box}
+.plan-ceo-box:focus{border-color:#EA580C}
+.plan-ceo-meta{font-size:.7rem;color:#aaa;margin-top:.3rem;text-align:right}
+@media (max-width:900px){.plan-board{grid-template-columns:1fr;overflow-y:auto}}
+</style>
+
+<div class="plan-header">
+  <div>
+    <div class="plan-title">Planejamento Comercial</div>
+    <div class="plan-semana">Semana de 23 a 27 de junho de 2026</div>
+  </div>
+  <div class="plan-progress">
+    <div class="plan-bar-wrap"><div class="plan-bar" id="planBar" style="width:0%"></div></div>
+    <div class="plan-pct" id="planPct">0%</div>
+  </div>
+</div>
+
+<div class="plan-board" id="planBoard"></div>
+
+<div class="plan-ceo-section">
+  <div class="plan-ceo-title">Comentário do CEO</div>
+  <textarea class="plan-ceo-box" id="planCeoComment" placeholder="Insira aqui orientações, prioridades ou feedback para a semana..."></textarea>
+  <div class="plan-ceo-meta" id="planCeoMeta"></div>
+</div>
+
+<script>
+const PLAN_DAYS = [
+  { dia:"Segunda", date:"23 jun", id:"seg" },
+  { dia:"Terça",   date:"24 jun", id:"ter" },
+  { dia:"Quarta",  date:"25 jun", id:"qua" },
+  { dia:"Quinta",  date:"26 jun", id:"qui" },
+  { dia:"Sexta",   date:"27 jun", id:"sex" },
+];
+
+const TIPO_LABEL = { prop:"Proposta", reun:"Reunião", pros:"Prospecção", prod:"Produção", vis:"Campo" };
+const TIPO_CLS   = { prop:"tp-prop", reun:"tp-reun", pros:"tp-pros", prod:"tp-prod", vis:"tp-vis" };
+
+const DEFAULT_TASKS = {
+  seg:[
+    { id:"p01", tipo:"prop",  text:"Finalizar e enviar proposta Limpano — cliente quente, decisão esta semana", badge:"hot", done:false },
+    { id:"p02", tipo:"pros",  text:"Follow-up LinkedIn: 9 contatos que responderam — avançar para reunião", done:false },
+    { id:"p03", tipo:"pros",  text:"WhatsApp: reativar 5 contatos da rede morna com nova abordagem", done:false },
+    { id:"p04", tipo:"prod",  text:"Atualizar painel comercial: inserir dados de prospecção da semana", done:false },
+  ],
+  ter:[
+    { id:"p05", tipo:"reun",  text:"Ligar para Andreia Zeferino (Scala) — confirmar data da reunião", badge:"hot", done:false },
+    { id:"p06", tipo:"prop",  text:"Preparar material de apresentação para reunião Scala", done:false },
+    { id:"p07", tipo:"pros",  text:"LinkedIn — 5 novos contatos: redes de atacado SP e RJ", done:false },
+    { id:"p08", tipo:"pros",  text:"WhatsApp — novos contatos via Lusha (alimentos e higiene)", done:false },
+  ],
+  qua:[
+    { id:"p09", tipo:"reun",  text:"Reunião confirmada com Da Colônia — levar deck atualizado", badge:"conf", done:false },
+    { id:"p10", tipo:"prop",  text:"Follow-up Limpano — retomar contato se sem resposta de seg/ter", done:false },
+    { id:"p11", tipo:"pros",  text:"LinkedIn — 5 contatos: distribuidoras e grupos de TM regionais", done:false },
+  ],
+  qui:[
+    { id:"p12", tipo:"reun",  text:"Reunião Scala — apresentação completa da proposta PDV Quality", badge:"hot", done:false },
+    { id:"p13", tipo:"prop",  text:"Pós-reunião: enviar proposta Scala no mesmo dia", done:false },
+    { id:"p14", tipo:"pros",  text:"WhatsApp — 2ª mensagem para leads sem resposta (follow-up 5 dias)", done:false },
+    { id:"p15", tipo:"prod",  text:"Documentar objections e aprendizados das reuniões da semana", done:false },
+  ],
+  sex:[
+    { id:"p16", tipo:"prod",  text:"Preencher Relatório Semanal de Prospecção + Fechamento do Mês", done:false },
+    { id:"p17", tipo:"reun",  text:"Revisão geral: Limpano, Scala, Da Colônia — status e próximos passos", done:false },
+    { id:"p18", tipo:"pros",  text:"Planejar semana 30/jun–4/jul — definir 3 prioridades e novos alvos", done:false },
+  ],
+};
+
+// Gera o identificador da semana atual no formato "semYYYY_WW" — muda automaticamente toda segunda-feira
+function semanaAtual() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 3 - (d.getDay()||7) + 1 - 3); // ajusta para segunda
+  const inicio = new Date(d.getFullYear(), 0, 1);
+  const sem = Math.ceil(((d - inicio) / 86400000 + inicio.getDay() + 1) / 7);
+  return `painel_comercial/planejamento_${d.getFullYear()}_w${String(sem).padStart(2,'0')}`;
+}
+const DOC_PLAN = semanaAtual();
+let planState = { tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)), ceo: "", ceoUpdated: "" };
+let dragTask = null, dragFromDay = null, saveTimer = null;
+
+function genId() { return "t_" + Math.random().toString(36).slice(2,8); }
+
+function planSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { fbSalvar(DOC_PLAN, { ...planState, updated: new Date().toISOString() }); } catch(e){}
+  }, 600);
+}
+
+async function planLoad() {
+  try {
+    const snap = await fbCarregar(DOC_PLAN);
+    if (snap && snap.tasks) planState.tasks = snap.tasks;
+    if (snap && snap.ceo !== undefined) planState.ceo = snap.ceo;
+    if (snap && snap.ceoUpdated) planState.ceoUpdated = snap.ceoUpdated;
+  } catch(e) {}
+  planRender();
+}
+
+function planTaskCard(t, dayId) {
+  const badge = t.badge === "hot"  ? '<span class="plan-badge b-hot">quente</span>' :
+                t.badge === "new"  ? '<span class="plan-badge b-new">hoje</span>'   :
+                t.badge === "conf" ? '<span class="plan-badge b-conf">confirmada</span>' :
+                '<span class="plan-badge b-empty">+ status</span>';
+  return `<div class="plan-task${t.done?" done":""}" data-id="${t.id}" data-day="${dayId}">
+    <div class="plan-task-row1">
+      <span class="plan-drag-handle" draggable="true" title="Arrastar">⠿</span>
+      <div class="plan-cb" onclick="planToggle('${dayId}','${t.id}')"><span class="plan-cb-check">✓</span></div>
+      <span class="plan-task-text" contenteditable="${t.done?'false':'true'}"
+        onblur="planEditText('${dayId}','${t.id}',this.innerText)"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${t.text}</span>
+      <button class="plan-rm" onclick="planRemove('${dayId}','${t.id}')" title="Remover">✕</button>
+    </div>
+    <div class="plan-task-foot">
+      <span class="plan-tipo ${TIPO_CLS[t.tipo]||''}" style="cursor:pointer" title="Clique para mudar o tipo" onclick="planCycleTipo('${dayId}','${t.id}')">${TIPO_LABEL[t.tipo]||t.tipo}</span>
+      <span style="cursor:pointer" title="Clique para mudar o status" onclick="planCycleBadge('${dayId}','${t.id}')">${badge}</span>
+    </div>
+  </div>`;
+}
+
+function planRender() {
+  const board = document.getElementById("planBoard");
+  if (!board) return;
+
+  let total = 0, done = 0;
+  Object.values(planState.tasks).forEach(tasks => tasks.forEach(t => { total++; if(t.done) done++; }));
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById("planBar").style.width = pct + "%";
+  document.getElementById("planPct").textContent = pct + "%";
+
+  board.innerHTML = PLAN_DAYS.map(d => {
+    const tasks = planState.tasks[d.id] || [];
+    const cardsHtml = tasks.map(t => planTaskCard(t, d.id)).join("");
+    return `<div class="plan-col">
+      <div class="plan-col-head">
+        <div class="plan-col-day">${d.dia}</div>
+        <div class="plan-col-date">${d.date}</div>
+        <div class="plan-col-count">${tasks.filter(t=>t.done).length}/${tasks.length} concluídas</div>
+      </div>
+      <div class="plan-col-body" id="day-${d.id}" data-day="${d.id}">${cardsHtml}</div>
+      <button class="plan-add-btn" onclick="planAddTask('${d.id}')">+ tarefa</button>
+    </div>`;
+  }).join("");
+
+  const ceoBox = document.getElementById("planCeoComment");
+  if (ceoBox) {
+    ceoBox.value = planState.ceo || "";
+    document.getElementById("planCeoMeta").textContent = planState.ceoUpdated ? "Atualizado em " + new Date(planState.ceoUpdated).toLocaleString("pt-BR") : "";
+    ceoBox.oninput = () => {
+      planState.ceo = ceoBox.value;
+      planState.ceoUpdated = new Date().toISOString();
+      document.getElementById("planCeoMeta").textContent = "Atualizado em " + new Date().toLocaleString("pt-BR");
+      planSave();
+    };
+  }
+
+  document.querySelectorAll(".plan-drag-handle").forEach(handle => {
+    handle.addEventListener("dragstart", e => {
+      const card = e.currentTarget.closest(".plan-task");
+      dragTask = card.dataset.id;
+      dragFromDay = card.dataset.day;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    handle.addEventListener("dragend", e => {
+      const card = e.currentTarget.closest(".plan-task");
+      if (card) card.classList.remove("dragging");
+    });
+  });
+
+  document.querySelectorAll(".plan-col-body").forEach(zone => {
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("drop", e => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      const toDay = zone.dataset.day;
+      if (!dragTask || !dragFromDay) return;
+      const fromTasks = planState.tasks[dragFromDay];
+      const idx = fromTasks.findIndex(t => t.id === dragTask);
+      if (idx === -1) return;
+      const [task] = fromTasks.splice(idx, 1);
+      if (!planState.tasks[toDay]) planState.tasks[toDay] = [];
+      planState.tasks[toDay].push(task);
+      dragTask = null; dragFromDay = null;
+      planSave();
+      planRender();
+    });
+  });
+}
+
+function planToggle(day, id) {
+  const t = (planState.tasks[day]||[]).find(x => x.id === id);
+  if (t) { t.done = !t.done; planSave(); planRender(); }
+}
+
+function planEditText(day, id, text) {
+  const t = (planState.tasks[day]||[]).find(x => x.id === id);
+  if (t && text.trim()) { t.text = text.trim(); planSave(); }
+}
+
+function planRemove(day, id) {
+  planState.tasks[day] = (planState.tasks[day]||[]).filter(x => x.id !== id);
+  planSave(); planRender();
+}
+
+function planCycleBadge(day, id) {
+  const t = (planState.tasks[day]||[]).find(x=>x.id===id);
+  if (!t) return;
+  const order = [undefined, "hot", "new", "conf"];
+  const cur = order.indexOf(t.badge);
+  t.badge = order[(cur+1) % order.length];
+  planSave(); planRender();
+}
+
+function planCycleTipo(day, id) {
+  const t = (planState.tasks[day]||[]).find(x=>x.id===id);
+  if (!t) return;
+  const order = ["prop","reun","pros","prod","vis"];
+  const cur = order.indexOf(t.tipo);
+  t.tipo = order[(cur+1) % order.length];
+  planSave(); planRender();
+}
+
+function planAddTask(day) {
+  const t = { id: genId(), tipo: "pros", text: "Nova tarefa", done: false };
+  if (!planState.tasks[day]) planState.tasks[day] = [];
+  planState.tasks[day].push(t);
+  planSave(); planRender();
+  setTimeout(() => {
+    const els = document.querySelectorAll(`#day-${day} .plan-task-text`);
+    if (els.length) { const last = els[els.length-1]; last.focus(); document.execCommand('selectAll'); }
+  }, 80);
+}
+
+(function waitFb() {
+  if (window._fbReady) { planLoad(); }
+  else setTimeout(waitFb, 200);
+})();
+</script>
+
+</div>
+
+<div class="page" id="p-fech"><iframe id="f-fech" class="tool-frame" src="/fechamento.html" frameborder="0" allowfullscreen></iframe></div>
+<div class="page" id="p-prosp"><iframe id="f-prosp" class="tool-frame" src="/prospeccao.html" frameborder="0" allowfullscreen></iframe></div>
+<div class="page" id="p-contr"><iframe id="f-contr" class="tool-frame" src="/contratos.html" frameborder="0" allowfullscreen></iframe></div>
+
+</div>
+
+
+<script>
+// ── ACUMULAÇÃO SEMANAL → FECHAMENTO MENSAL ──
+function semanaISO(d) {
+  var tmp = new Date(d); tmp.setHours(0,0,0,0);
+  tmp.setDate(tmp.getDate() + 3 - (tmp.getDay() + 6) % 7);
+  var w1 = new Date(tmp.getFullYear(), 0, 4);
+  return tmp.getFullYear() + '-W' + String(1 + Math.round(((tmp - w1) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7)).padStart(2,'0');
+}
+function atualizarFechamento(dashData) {
+  var hoje = new Date();
+  var mesKey = hoje.getFullYear() + '-' + (hoje.getMonth() + 1);
+  var semKey = semanaISO(hoje);
+  var snap = {semana:semKey, mes:mesKey, f1:parseInt(dashData.f1)||0, f2:parseInt(dashData.f2)||0, f3:parseInt(dashData.f3)||0, f4:parseInt(dashData.f4)||0, f5:parseInt(dashData.f5)||0, updated:new Date().toISOString()};
+  db.doc('painel_comercial_semanal/' + semKey).set(snap);
+  db.collection('painel_comercial_semanal').where('mes','==',mesKey).get().then(function(snaps) {
+    var t = {f1:0,f2:0,f3:0,f4:0,f5:0,semanas:[]};
+    snaps.forEach(function(doc){ var d=doc.data(); t.f1+=d.f1||0; t.f2+=d.f2||0; t.f3+=d.f3||0; t.f4+=d.f4||0; t.f5+=d.f5||0; t.semanas.push(d.semana); });
+    var funil = {f1:String(t.f1),f2:String(t.f2),f3:String(t.f3),f4:String(t.f4),f5:String(t.f5)};
+    db.collection('painel_comercial_fechamento').doc(mesKey).set({funil:funil, semanasAcumuladas:t.semanas, updated:new Date().toISOString()},{merge:true}).then(function(){
+      console.log('Fechamento atualizado: ' + mesKey + ' (semanas: ' + t.semanas.join(', ') + ')');
+    });
+  }).catch(function(e){ console.log('Erro acumulação:', e.message); });
+}
+
+function show(id) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  var page = document.getElementById('p-' + id);
+  var tab  = document.getElementById('t-' + id);
+  if (page) page.classList.add('active');
+  if (tab)  tab.classList.add('active');
+  if (id === 'plan' && typeof planRender === 'function') { planRender(); }
+  if (id === 'fech') { loadFechamento(); }
+}
+
+// ── FECHAMENTO ──
+function loadFechamento() {
+  const iframe = document.getElementById('f-fech');
+  if (!iframe) return;
+  setTimeout(function() {
+    const mes = new Date().getFullYear() + '-' + (new Date().getMonth()+1);
+    db.collection('painel_comercial_fechamento').doc(mes).get().then(function(doc) {
+      if (doc.exists && iframe.contentWindow) iframe.contentWindow.postMessage({type:'FECH_LOAD', data: doc.data()}, '*');
+    }).catch(function(){});
+    db.doc('painel_comercial/reunioes').get().then(function(doc) {
+      if (doc.exists && iframe.contentWindow) iframe.contentWindow.postMessage({type:'REUN_UPDATE', reunioes: doc.data().lista||[]}, '*');
+    }).catch(function(){});
+  }, 600);
+}
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'NAV') { show(e.data.page); return; }
+  if (e.data.type === 'FECH_SAVE') {
+    db.collection('painel_comercial_fechamento').doc(e.data.mes).set(Object.assign({}, e.data.data, {updated: new Date().toISOString()}));
+  }
+  if (e.data.type === 'FECH_LOAD_REQ') {
+    var iframe = document.getElementById('f-fech');
+    if (!iframe || !iframe.contentWindow) return;
+    db.collection('painel_comercial_fechamento').doc(e.data.mes).get().then(function(doc) {
+      if (doc.exists) iframe.contentWindow.postMessage({type:'FECH_LOAD', data: doc.data()}, '*');
+    }).catch(function(){});
+    db.doc('painel_comercial/reunioes').get().then(function(doc) {
+      if (doc.exists) iframe.contentWindow.postMessage({type:'REUN_UPDATE', reunioes: doc.data().lista||[]}, '*');
+    }).catch(function(){});
+  }
+});
+</script>
+
+</body>
+</html>

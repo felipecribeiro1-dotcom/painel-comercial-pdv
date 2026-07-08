@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Quality — Calculadora de Decupagem</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2A;--navy2:#162236;
+  --gold:#C9A84C;--gold2:#E8C97A;
+  --bg:#F0F3F8;--surface:#fff;--border:#DDE3EE;
+  --text:#1E293B;--muted:#64748B;--faint:#94A3B8;
+  --green:#1A7A4A;--green-bg:#E1F5EE;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--navy);border-bottom:1px solid rgba(255,255,255,.07);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px}
+.logo{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo-mark{width:28px;height:28px;background:var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:13px;color:var(--navy);font-weight:700}
+.logo-name{font-family:'DM Serif Display',serif;font-size:15px;color:#fff}
+.topbar-title{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.08em;text-transform:uppercase}
+.topbar-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.regime-toggle{display:flex;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:7px;overflow:hidden}
+.regime-toggle button{padding:5px 12px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;background:transparent;border:none;color:rgba(255,255,255,.4)}
+.regime-toggle button.active{background:var(--gold);color:var(--navy);border-radius:5px;margin:2px}
+.btn-top{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:5px 11px;font-size:11px;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap}
+.btn-top:hover{background:rgba(255,255,255,.12);color:#fff}
+.btn-save{background:rgba(74,222,128,.15);border-color:rgba(74,222,128,.3);color:#4ade80}
+.btn-save:hover{background:rgba(74,222,128,.25)!important;color:#4ade80!important}
+
+/* SPREAD BANNER */
+.spread-banner{background:linear-gradient(135deg,#0B2415,#163D26);border-bottom:1px solid rgba(201,168,76,.15);padding:12px 24px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px}
+.spread-col{display:flex;flex-direction:column;gap:2px}
+.spread-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4)}
+.spread-val{font-family:'DM Serif Display',serif;font-size:22px;color:#fff}
+.spread-val.gold{color:var(--gold)}
+.spread-val.green{color:#4ade80}
+.spread-center{text-align:center}
+.spread-arrow{font-size:24px;opacity:.3}
+.spread-diff{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+
+/* GRID DUAL */
+.dual-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;background:var(--bg)}
+.dual-col{padding:20px 20px 40px}
+.dual-col.cli{background:#FFFDF5}
+.col-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:14px}
+.badge-base{background:var(--navy2);color:rgba(255,255,255,.7)}
+.badge-cli{background:var(--gold);color:var(--navy)}
+
+/* PROMOTORES / VALOR */
+.promo-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.promo-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.promo-card.cli{background:#FFFBEE;border-color:#F3E0A0}
+.promo-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}
+.promo-wrap{display:flex;align-items:center;gap:4px}
+.promo-prefix{font-size:13px;color:var(--muted);font-family:'DM Mono',monospace}
+.promo-input{font-size:18px;font-weight:700;font-family:'DM Mono',monospace;border:none;outline:none;background:transparent;width:100%;color:var(--text)}
+.promo-hint{font-size:10px;color:var(--faint);margin-top:2px}
+
+/* DECUPAGEM CARD */
+.dec-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.dec-card.cli{background:#FFFBEE;border-color:#F3E0A0}
+.dec-card-hdr{padding:12px 16px;background:var(--navy2);display:flex;justify-content:space-between;align-items:center}
+.dec-card.cli .dec-card-hdr{background:#7A5010}
+.dec-card-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.08em}
+.dec-card-regime{font-size:10px;color:rgba(255,255,255,.4)}
+
+.dec-sec{border-bottom:1px solid var(--border)}
+.dec-sec-hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;user-select:none}
+.dec-sec-hdr:hover{background:rgba(0,0,0,.02)}
+.dec-sec-left{display:flex;align-items:center;gap:8px}
+.dec-sec-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.dec-sec-name{font-size:12px;font-weight:600;color:var(--text)}
+.dec-sec-total{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--text)}
+.dec-chevron{font-size:10px;color:var(--faint);margin-left:6px;transition:transform .2s}
+.dec-sec:not(.open) .dec-chevron{transform:rotate(-90deg)}
+.dec-rows{display:none;flex-direction:column;gap:0;padding:4px 0}
+.dec-sec.open .dec-rows{display:flex}
+
+.dec-row{display:flex;align-items:center;padding:5px 14px;gap:8px}
+.dec-row:hover{background:rgba(0,0,0,.015)}
+.dec-row-label{font-size:11px;color:var(--muted);flex:1;min-width:0}
+.dec-row-pct{font-size:10px;color:var(--faint);font-family:'DM Mono',monospace;width:36px;text-align:right;flex-shrink:0}
+.enc-input{width:88px;border:1.5px solid var(--border);border-radius:5px;padding:3px 6px;font-size:12px;font-family:'DM Mono',monospace;font-weight:500;text-align:right;background:var(--surface);transition:all .15s}
+.enc-input:hover{border-color:var(--gold);background:#FFFDF5}
+.enc-input:focus{border-color:var(--gold);outline:none}
+.dec-row-input{width:88px;border:1px solid transparent;border-radius:5px;padding:3px 6px;font-size:12px;font-family:'DM Mono',monospace;font-weight:500;text-align:right;background:transparent;color:var(--text);flex-shrink:0}
+.dec-row-input:hover{border-color:var(--border);background:var(--surface)}
+.dec-row-input:focus{border-color:var(--gold);outline:none;background:var(--surface)}
+.dec-row-input.modified{border-color:var(--gold)!important;background:#FFFBEE!important;color:#92400e;font-weight:700}
+.dec-row-diff{font-size:10px;font-family:'DM Mono',monospace;width:64px;text-align:right;flex-shrink:0}
+.dec-row-diff.pos{color:#16a34a;font-weight:700}
+.dec-row-diff.neg{color:#dc2626;font-weight:700}
+
+.dec-sub{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;padding:7px 14px;background:var(--bg);margin:2px 0;font-size:11px;font-weight:700;color:var(--muted)}
+.dec-sub span:last-child{font-family:'DM Mono',monospace;color:var(--text)}
+.dec-total{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy2);margin:0}
+.dec-card.cli .dec-total{background:#7A5010}
+.dec-total-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em}
+.dec-total-val{font-family:'DM Serif Display',serif;font-size:20px;color:var(--gold)}
+.dec-total-spread{font-size:10px;color:#4ade80;margin-top:2px;text-align:right}
+
+/* RESULTADO FINANCEIRO */
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.result-card.cli{background:#FFFBEE;border-color:#F3E0A0}
+.result-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.result-val{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text)}
+.result-row{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid var(--border)}
+.result-row:last-child{border:none}
+.result-row span:last-child{font-family:'DM Mono',monospace;font-weight:600}
+
+/* SPREAD HIGHLIGHT */
+.spread-box{background:linear-gradient(135deg,#14532d,#166534);border-radius:10px;padding:14px 16px;margin-top:12px}
+.spread-box-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#86efac;margin-bottom:4px}
+.spread-box-val{font-family:'DM Serif Display',serif;font-size:28px;color:#4ade80}
+.spread-box-sub{font-size:11px;color:#86efac;margin-top:2px}
+.spread-box-rows{margin-top:10px;display:flex;flex-direction:column;gap:3px}
+.spread-box-row{display:flex;justify-content:space-between;font-size:11px;color:#86efac}
+.spread-box-row span:last-child{font-family:'DM Mono',monospace;font-weight:700;color:#4ade80}
+
+/* EXPORT BTNS */
+.export-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.btn-export{border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-export-base{background:var(--navy2);color:#fff}
+.btn-export-cli{background:var(--gold);color:var(--navy)}
+.btn-export-base:hover{background:#1e3045}
+.btn-export-cli:hover{background:#b8922c}
+
+@media(max-width:900px){.dual-grid{grid-template-columns:1fr}.promo-row{grid-template-columns:1fr}.result-grid{grid-template-columns:1fr}}
+@media print{.topbar,.spread-banner,.col-badge,.export-row,.btn-top,.regime-toggle{display:none!important}.dual-grid{background:#fff}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">PQ</div>
+    <div class="logo-name">PDV Quality</div>
+  </div>
+  <div class="topbar-title">Calculadora de Decupagem</div>
+  <div class="topbar-actions">
+    <div class="regime-toggle">
+      <button id="btnS"  class="active" onclick="setRegime('s')">Simples</button>
+      <button id="btnSS" onclick="setRegime('ss')">Simples Semi</button>
+      <button id="btnL"  onclick="setRegime('l')">Lucro Real</button>
+      <button id="btnLS" onclick="setRegime('ls')">Real Semi</button>
+    </div>
+    <button class="btn-top btn-save" onclick="salvarPadrao()">💾 Salvar padrão</button>
+    <button class="btn-top" onclick="resetBase()">↺ Restaurar</button>
+    <button class="btn-top" onclick="window.print()">🖨 PDF</button>
+  </div>
+</div>
+
+<!-- SPREAD BANNER -->
+<div class="spread-banner">
+  <div class="spread-col">
+    <div class="spread-label">Total Base (interno)</div>
+    <div class="spread-val" id="sb_base">—</div>
+    <div class="spread-diff" id="sb_base_per">— por promotor</div>
+  </div>
+  <div class="spread-center">
+    <div class="spread-arrow">→</div>
+    <div class="spread-label" style="color:rgba(255,255,255,.3)">spread</div>
+  </div>
+  <div class="spread-col">
+    <div class="spread-label">Total Cliente (proposta)</div>
+    <div class="spread-val gold" id="sb_cli">—</div>
+    <div class="spread-diff" id="sb_cli_per">— por promotor</div>
+  </div>
+</div>
+
+<div class="dual-grid">
+
+  <!-- ══ COLUNA BASE ══ -->
+  <div class="dual-col">
+    <div class="col-badge badge-base">🔒 Decupagem Base — Uso Interno</div>
+
+    <!-- Promotores + Valor -->
+    <div class="promo-row">
+      <div class="promo-card">
+        <div class="promo-label">Promotores</div>
+        <div class="promo-wrap">
+          <input class="promo-input" type="number" id="inPromo" value="10" min="1" max="500" oninput="calcAll()">
+        </div>
+        <div class="promo-hint">Número de promotores no contrato</div>
+      </div>
+      <div class="promo-card">
+        <div class="promo-label">Valor cobrado/promotor</div>
+        <div class="promo-wrap">
+          <span class="promo-prefix">R$</span>
+          <input class="promo-input" type="number" id="inValor" value="5500" min="0" step="50" oninput="calcAll()">
+        </div>
+        <div class="promo-hint" id="valorPadraoHint">Fatura mensal por promotor · incluso no padrão salvo</div>
+      </div>
+    </div>
+
+    <!-- Decupagem Base -->
+    <div class="dec-card" id="decBase">
+      <div class="dec-card-hdr">
+        <div class="dec-card-title">Custo por Promotor — Promotor Modal Full Time</div>
+        <div class="dec-card-regime" id="decRegimeBase">Simples Nacional</div>
+      </div>
+
+      <!-- Salários -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#EFF6FF">💼</div><div class="dec-sec-name">Salários (B)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="bTotB">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows">
+          <div class="dec-row"><span class="dec-row-label">Salário (B)</span><span class="dec-row-pct">100%</span><input class="dec-row-input" type="number" id="b_sal" value="1805.43" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Insalubridade</span><span class="dec-row-pct">0%</span><input class="dec-row-input" type="number" id="b_ins" value="0" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Periculosidade</span><span class="dec-row-pct">0%</span><input class="dec-row-input" type="number" id="b_per" value="0" step="0.01" oninput="calcAll()"></div>
+        </div>
+      </div>
+
+      <!-- Encargos -->
+      <div class="dec-sec open" id="bSecEnc">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#FFF7ED">⚖️</div><div class="dec-sec-name">Encargos Trabalhistas (C)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="bTotC">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows" id="bRowsC"></div>
+      </div>
+
+      <div class="dec-sub" style="flex-direction:column;gap:2px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span>Total Encargos + Salários A=(B+C)</span><span id="bTotA">—</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--faint)">
+      <span id="bPctBsub">— Salários · —% / — Encargos · —%</span>
+    </div>
+  </div>
+
+      <!-- Benefícios -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#F0FFF4">🎁</div><div class="dec-sec-name">Benefícios e Apoio Operacional (D)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="bTotD">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows">
+          <div class="dec-row"><span class="dec-row-label">Vale Refeição</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_vr" value="521.41" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Vale Transporte</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_vt" value="0" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Backoffice</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_bkof" value="0" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Power BI</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_pbi" value="0" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Cesta Básica</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_cesta" value="173.79" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Sistema Operacional</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_sis" value="100" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Telefonia + Internet</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_tel" value="120" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Documentações + PCMSO + ASO</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_doc" value="50" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Plano Odontológico</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_odonto" value="35" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Seguro de Vida</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_seg" value="9.90" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">BKO (DP + RH + Contabilidade)</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_bko" value="200" step="0.01" oninput="calcAll()"></div>
+          <div class="dec-row"><span class="dec-row-label">Uniforme + EPI</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="b_uni" value="70" step="0.01" oninput="calcAll()"></div>
+        </div>
+      </div>
+
+      <div class="dec-sub" style="flex-direction:column;gap:2px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span>Total Salários + Encargos + Benefícios (A+D)</span><span id="bTotAD">—</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--faint)">
+      <span id="bPctD">— Benefícios · —% do custo</span>
+    </div>
+  </div>
+
+      <!-- Taxa Fee + Impostos -->
+      <div class="dec-sec open" id="bSecFee">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#F8F0FF">🧾</div><div class="dec-sec-name" id="bFeeLabel">Taxa Fee + NF (E+F)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="bTotEF">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows" id="bRowsEF"></div>
+      </div>
+
+      <div class="dec-total">
+        <div>
+          <div class="dec-total-label">Custo Base por Promotor</div>
+          <div class="dec-total-spread" id="bSpreadLabel">—</div>
+        </div>
+        <div class="dec-total-val" id="bTotGeral">—</div>
+      </div>
+    </div>
+
+    <!-- Resultado Base -->
+    <div class="result-grid">
+      <div class="result-card">
+        <div class="result-label">Fatura base total</div>
+        <div class="result-val" id="bFatTotal">—</div>
+        <div style="margin-top:6px">
+          <div class="result-row"><span>Custo total</span><span id="bCustoTotal">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="export-row">
+      <button class="btn-export btn-export-base" onclick="exportExcel('base')">📊 Excel — Base</button>
+      <button class="btn-export btn-export-base" onclick="exportPDF('base')">📄 PDF — Base</button>
+    </div>
+  </div>
+
+  <!-- ══ COLUNA CLIENTE ══ -->
+  <div class="dual-col cli">
+    <div class="col-badge badge-cli">📤 Decupagem Cliente — Proposta Comercial</div>
+
+    <!-- Indicação -->
+    <div style="background:#FFFBEE;border:1px dashed #F3E0A0;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:#92400e">
+      💡 Ajuste os valores linha a linha. Campos em <strong>amarelo</strong> diferem da base e entram como seu spread. Deixe em branco para usar o mesmo valor da base.
+    </div>
+
+    <!-- Promotores cliente (mesmo do base, read-only) -->
+    <div class="promo-row">
+      <div class="promo-card cli">
+        <div class="promo-label">Promotores (mesmo da base)</div>
+        <div class="promo-wrap">
+          <input class="promo-input" type="number" id="cPromo" value="10" readonly style="color:var(--muted)">
+        </div>
+        <div class="promo-hint">Igual à coluna base</div>
+      </div>
+      <div class="promo-card cli">
+        <div class="promo-label">Valor proposto ao cliente</div>
+        <div class="promo-wrap">
+          <span class="promo-prefix">R$</span>
+          <input class="promo-input" type="number" id="cValor" value="0" min="0" step="50" oninput="calcAll()" placeholder="auto" style="color:#92400e">
+        </div>
+        <div class="promo-hint" id="cValorHint">= custo cliente + spread</div>
+      </div>
+    </div>
+
+    <!-- Decupagem Cliente -->
+    <div class="dec-card cli" id="decCli">
+      <div class="dec-card-hdr">
+        <div class="dec-card-title">Proposta ao Cliente — valores apresentados</div>
+        <div class="dec-card-regime" id="decRegimeCli">Simples Nacional</div>
+      </div>
+
+      <!-- Salários Cliente -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#FEF3C7">💼</div><div class="dec-sec-name">Salários (B)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="cTotB">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows">
+          <div class="dec-row"><span class="dec-row-label">Salário (B)</span><span class="dec-row-pct">100%</span><input class="dec-row-input" type="number" id="c_sal" step="0.01" placeholder="= base" oninput="markModified(this,'b_sal');calcAll()"><span class="dec-row-diff" id="d_sal">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Insalubridade</span><span class="dec-row-pct">0%</span><input class="dec-row-input" type="number" id="c_ins" step="0.01" placeholder="= base" oninput="markModified(this,'b_ins');calcAll()"><span class="dec-row-diff" id="d_ins">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Periculosidade</span><span class="dec-row-pct">0%</span><input class="dec-row-input" type="number" id="c_per" step="0.01" placeholder="= base" oninput="markModified(this,'b_per');calcAll()"><span class="dec-row-diff" id="d_per">—</span></div>
+        </div>
+      </div>
+
+      <!-- Encargos Cliente -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#FEF9C3">⚖️</div><div class="dec-sec-name">Encargos Trabalhistas (C)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="cTotC">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows" id="cRowsC">
+          <div class="dec-row" style="padding:10px 14px"><span style="font-size:11px;color:var(--faint)">Calculado automaticamente sobre salários</span></div>
+        </div>
+      </div>
+
+      <div class="dec-sub" style="background:#FFFBEE"><span>Total Encargos + Salários A=(B+C)</span><span id="cTotA">—</span></div>
+
+      <!-- Benefícios Cliente -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#FEF9C3">🎁</div><div class="dec-sec-name">Benefícios e Apoio (D)</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="cTotD">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows">
+          <div class="dec-row"><span class="dec-row-label">Vale Refeição</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_vr" step="0.01" placeholder="= base" oninput="markModified(this,'b_vr');calcAll()"><span class="dec-row-diff" id="d_vr">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Vale Transporte</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_vt" step="0.01" placeholder="= base" oninput="markModified(this,'b_vt');calcAll()"><span class="dec-row-diff" id="d_vt">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Backoffice</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_bkof" step="0.01" placeholder="= base" oninput="markModified(this,'b_bkof');calcAll()"><span class="dec-row-diff" id="d_bkof">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Power BI</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_pbi" step="0.01" placeholder="= base" oninput="markModified(this,'b_pbi');calcAll()"><span class="dec-row-diff" id="d_pbi">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Cesta Básica</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_cesta" step="0.01" placeholder="= base" oninput="markModified(this,'b_cesta');calcAll()"><span class="dec-row-diff" id="d_cesta">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Sistema Operacional</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_sis" step="0.01" placeholder="= base" oninput="markModified(this,'b_sis');calcAll()"><span class="dec-row-diff" id="d_sis">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Telefonia + Internet</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_tel" step="0.01" placeholder="= base" oninput="markModified(this,'b_tel');calcAll()"><span class="dec-row-diff" id="d_tel">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Documentações</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_doc" step="0.01" placeholder="= base" oninput="markModified(this,'b_doc');calcAll()"><span class="dec-row-diff" id="d_doc">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Plano Odontológico</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_odonto" step="0.01" placeholder="= base" oninput="markModified(this,'b_odonto');calcAll()"><span class="dec-row-diff" id="d_odonto">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Seguro de Vida</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_seg" step="0.01" placeholder="= base" oninput="markModified(this,'b_seg');calcAll()"><span class="dec-row-diff" id="d_seg">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">BKO (DP + RH + Contabilidade)</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_bko" step="0.01" placeholder="= base" oninput="markModified(this,'b_bko');calcAll()"><span class="dec-row-diff" id="d_bko">—</span></div>
+          <div class="dec-row"><span class="dec-row-label">Uniforme + EPI</span><span class="dec-row-pct">—</span><input class="dec-row-input" type="number" id="c_uni" step="0.01" placeholder="= base" oninput="markModified(this,'b_uni');calcAll()"><span class="dec-row-diff" id="d_uni">—</span></div>
+        </div>
+      </div>
+
+      <div class="dec-sub" style="background:#FFFBEE"><span>Total (A+D)</span><span id="cTotAD">—</span></div>
+
+      <!-- Taxa Fee Cliente — editável -->
+      <div class="dec-sec open">
+        <div class="dec-sec-hdr" onclick="toggleSec(this.parentElement)">
+          <div class="dec-sec-left"><div class="dec-sec-icon" style="background:#FEF9C3">🧾</div><div class="dec-sec-name" id="cFeeLabel">Taxa Fee + NF</div></div>
+          <div style="display:flex;align-items:center"><div class="dec-sec-total" id="cTotEF">—</div><div class="dec-chevron">▾</div></div>
+        </div>
+        <div class="dec-rows">
+          <div class="dec-row">
+            <span class="dec-row-label">Taxa Fee (%)</span>
+            <span class="dec-row-pct">—</span>
+            <input class="dec-row-input" type="number" id="c_fee_pct" value="10" min="0" max="50" step="0.5" style="width:60px" oninput="calcAll()">%
+            <span class="dec-row-diff" id="d_fee">—</span>
+          </div>
+          <div class="dec-rows" id="cRowsFee"></div>
+        </div>
+      </div>
+
+      <div class="dec-total">
+        <div>
+          <div class="dec-total-label">Total por Promotor — Proposta Cliente</div>
+          <div class="dec-total-spread" id="cSpreadLabel">—</div>
+        </div>
+        <div class="dec-total-val" id="cTotGeral">—</div>
+      </div>
+    </div>
+
+
+    <div class="export-row">
+      <button class="btn-export btn-export-cli" onclick="exportExcel('cli')">📊 Excel — Proposta</button>
+      <button class="btn-export btn-export-cli" onclick="exportPDF('cli')">📄 PDF — Proposta</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── FIREBASE ──
+const fbCfg = {apiKey:"AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",authDomain:"painel-pdv-quality.firebaseapp.com",projectId:"painel-pdv-quality",storageBucket:"painel-pdv-quality.firebasestorage.app",messagingSenderId:"1075785754630",appId:"1:1075785754630:web:e7301ed75ff44da800bb87"};
+let fbDb = null;
+try { firebase.initializeApp(fbCfg); fbDb = firebase.firestore(); } catch(e) {}
+
+// ── DEFAULTS ──
+const DEF = {sal:1805.43,ins:0,per:0,vr:521.41,vt:0,bkof:0,pbi:0,cesta:173.79,sis:100,tel:120,doc:50,odonto:35,seg:9.90,bko:200,uni:70};
+const DEF_CAMPOS = ['sal','ins','per','vr','vt','bkof','pbi','cesta','sis','tel','doc','odonto','seg','bko','uni'];
+let regime = 's';
+
+const fmt  = n => 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtK = n => n>=1000?'R$ '+(n/1000).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'k':fmt(n);
+const el   = id => document.getElementById(id);
+const vb   = id => parseFloat(el(id)?.value)||0;
+const vc   = (cId, bId) => {
+  const e = el(cId);
+  const v = e ? parseFloat(e.value) : NaN;
+  return isNaN(v) || e.value === '' ? vb(bId) : v;
+};
+
+// ── ENCARGOS ──
+function encargosS(sal) {
+  const fgts=sal*0.08,fer=sal*0.0833,terc=fer/3,fgts2=(fer+terc)*0.089;
+  const dec=sal*0.0833,fgts3=dec*0.08,multa=(fgts+fgts2+fgts3)*0.40;
+  return [["FGTS","8%",fgts],["Férias","8,33%",fer],["1/3 de Férias","2,78%",terc],["FGTS s/ 1/3 Férias","0,89%",fgts2],["13º Salário","8,33%",dec],["FGTS s/ 13º","0,72%",fgts3],["Multa 40% FGTS","4,11%",multa]];
+}
+function encargosL(sal) {
+  const inss=sal*0.23,terc=sal*0.058,fgts=sal*0.08,fer=sal*0.0833,um3=fer/3,fgts2=(fer+um3)*0.0089,ins2=(fer+um3)*0.32,dec=sal*0.0833,fgts3=dec*0.0067,ins3=dec*0.24;
+  return [["INSS Patronal+GILRAT","23%",inss],["Terceiros","5,8%",terc],["FGTS","8%",fgts],["Férias","8,33%",fer],["1/3 de Férias","2,78%",um3],["FGTS s/ Férias","0,89%",fgts2],["INSS s/ Férias","3,2%",ins2],["13º Salário","8,33%",dec],["FGTS s/ 13º","0,67%",fgts3],["INSS s/ 13º","2,4%",ins3]];
+}
+function encargosSSemi(sal) { return [["FGTS (semi prov.)","8%",sal*0.08]]; }
+function encargosLSemi(sal) { return [["INSS Patronal+GILRAT (semi)","23%",sal*0.23],["Terceiros (semi)","5,8%",sal*0.058],["FGTS (semi)","8%",sal*0.08]]; }
+function encargosFor(sal,reg){ if(reg==='s')return encargosS(sal);if(reg==='ss')return encargosSSemi(sal);if(reg==='l')return encargosL(sal);if(reg==='ls')return encargosLSemi(sal);return encargosS(sal); }
+function calcFeeRows(totAD, feePct, reg) {
+  const fee = totAD * feePct;
+  const isSimples = reg==='s'||reg==='ss';
+  if (isSimples) {
+    const nf = (totAD + fee) * 0.195;
+    return [["Taxa Fee ("+Math.round(feePct*100)+"%) (E)", (feePct*100).toFixed(1)+"%", fee], ["NF (19,50%) (F)", "19,5%", nf]];
+  } else {
+    const ir=totAD*0.015,csll=totAD*0.009,totE=fee+ir+csll,nf=(totAD+totE)*0.1425;
+    return [["Taxa Fee ("+Math.round(feePct*100)+"%) (E)", (feePct*100).toFixed(1)+"%", fee],["IR (1,5%)", "1,5%", ir],["CSLL (0,9%)", "0,9%", csll],["NF+ISS+PIS+COFINS","14,25%",nf]];
+  }
+}
+
+function renderRows(cId, rows, editable) {
+  const c = el(cId); if(!c) return;
+  c.innerHTML = '';
+  rows.forEach(([lbl,pct,val], i) => {
+    const d = document.createElement('div'); d.className = 'dec-row';
+    if (editable) {
+      const inputId = cId + '_enc_' + i;
+      d.innerHTML = `<span class="dec-row-label">${lbl}</span><span class="dec-row-pct">${pct}</span><input class="enc-input" id="${inputId}" type="number" step="0.01" value="${val.toFixed(2)}" data-default="${val.toFixed(2)}" oninput="onEncInput(this);calcAll()">`;
+    } else {
+      d.innerHTML = `<span class="dec-row-label">${lbl}</span><span class="dec-row-pct">${pct}</span><span class="dec-row-input" style="width:88px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;padding:3px 6px">${fmt(val)}</span>`;
+    }
+    c.appendChild(d);
+  });
+}
+function onEncInput(inp){
+  const def=parseFloat(inp.dataset.default)||0, cur=parseFloat(inp.value)||0;
+  inp.classList.toggle('modified', Math.abs(cur-def)>0.01);
+}
+function getEncSum(cId){let t=0;const c=el(cId);if(!c)return 0;c.querySelectorAll('.enc-input').forEach(i=>t+=parseFloat(i.value)||0);return t;}
+function getRowsTotal(cId) {
+  let t=0;
+  el(cId)?.querySelectorAll('.dec-row-input[type="number"]').forEach(i=>t+=parseFloat(i.value)||0);
+  return t;
+}
+function rowsSum(rows) { return rows.reduce((a,[,,v])=>a+v,0); }
+
+function markModified(inp, baseId) {
+  const v = parseFloat(inp.value);
+  const bv = vb(baseId);
+  inp.classList.toggle('modified', !isNaN(v) && inp.value !== '' && v !== bv);
+}
+
+function setRegime(r) {
+  regime = r;
+  ['btnS','btnSS','btnL','btnLS'].forEach(id=>{const b=el(id);if(b)b.classList.remove('active');});
+  const btnMap={s:'btnS',ss:'btnSS',l:'btnL',ls:'btnLS'};
+  if(el(btnMap[r]))el(btnMap[r]).classList.add('active');
+  const labels={s:'Simples Nacional',ss:'Simples Semi Prov.',l:'Lucro Real',ls:'Lucro Real Semi Prov.'};
+  ['decRegimeBase','decRegimeCli'].forEach(id=>{const e=el(id);if(e)e.textContent=labels[r]||'';});
+  const isS=r==='s'||r==='ss';
+  el('bFeeLabel').textContent=isS?'Taxa Fee + NF (E+F)':'Taxa Fee + Impostos (E+F)';
+  el('cFeeLabel').textContent=isS?'Taxa Fee + NF':'Taxa Fee + Impostos';
+  calcAll();
+}
+
+// ── CÁLCULO PRINCIPAL ──
+function calcAll() {
+  const promo = Math.max(1, parseInt(el('inPromo').value)||1);
+  el('cPromo').value = promo;
+
+  // ── BASE ──
+  const bSal = vb('b_sal'), bIns = vb('b_ins'), bPer = vb('b_per');
+  const bTotB = bSal + bIns + bPer;
+  el('bTotB').textContent = fmt(bTotB);
+
+  const bEnc = encargosFor(bTotB, regime);
+  // Só re-renderiza se a quantidade de linhas mudou (regime trocou)
+  const existingEncB = el('bRowsC')?.querySelectorAll('.enc-input');
+  if (!existingEncB || existingEncB.length !== bEnc.length) {
+    renderRows('bRowsC', bEnc, true);
+  } else {
+    // Atualiza inputs não-editados com o novo valor calculado (ex: salário mudou)
+    bEnc.forEach(([,,calcVal], i) => {
+      const inp = existingEncB[i];
+      if (inp && !inp.classList.contains('modified')) {
+        inp.value = calcVal.toFixed(2);
+        inp.dataset.default = calcVal.toFixed(2);
+      }
+    });
+  }
+  const bTotC = getEncSum('bRowsC') || rowsSum(bEnc);
+  el('bTotC').textContent = fmt(bTotC);
+  const bTotA = bTotB + bTotC;
+  el('bTotA').textContent = fmt(bTotA);
+
+  const bTotD = ['vr','vt','bkof','pbi','cesta','sis','tel','doc','odonto','seg','bko','uni'].reduce((s,k)=>s+vb('b_'+k),0);
+  el('bTotD').textContent = fmt(bTotD);
+  const bTotAD = bTotA + bTotD;
+  el('bTotAD').textContent = fmt(bTotAD);
+
+  const bFeeRows = calcFeeRows(bTotAD, 0.10, regime);
+  (()=>{const _ex=el('bRowsEF')?.querySelectorAll('.enc-input');if(!_ex||_ex.length!==bFeeRows.length){renderRows('bRowsEF',bFeeRows,true);}else{bFeeRows.forEach(([,,v],i)=>{const _i=_ex[i];if(_i&&!_i.classList.contains('modified')){_i.value=v.toFixed(2);_i.dataset.default=v.toFixed(2);}});}})();
+  const bTotEF = getEncSum('bRowsEF') || rowsSum(bFeeRows);
+  el('bTotEF').textContent = fmt(bTotEF);
+
+  const bCusto = bTotAD + bTotEF;
+  el('bTotGeral').textContent = fmt(bCusto);
+
+  const inValor = vb('inValor');
+  const bSpread = Math.max(0, inValor - bCusto);
+  const bFatTotal = inValor * promo;
+  const bCustoTotal = bCusto * promo;
+
+  // Subtotais %
+  const bSalBase = bTotB;
+  const bPctBVal = bCusto > 0 ? (bSalBase/bCusto*100).toFixed(1) : '—';
+  const bPctCVal = bCusto > 0 ? (bTotC/bCusto*100).toFixed(1) : '—';
+  const bPctDVal = bCusto > 0 ? (bTotD/bCusto*100).toFixed(1) : '—';
+  const bPctEFVal = bCusto > 0 ? (bTotEF/bCusto*100).toFixed(1) : '—';
+  const bSubEl = el('bPctBsub');
+  if(bSubEl) bSubEl.textContent = 'Salários ' + bPctBVal + '% · Encargos ' + bPctCVal + '% do custo total';
+  const bDEl = el('bPctD');
+  if(bDEl) bDEl.textContent = 'Benefícios ' + bPctDVal + '% · Fee+NF ' + bPctEFVal + '% do custo total';
+  el('bSpreadLabel').textContent = bSpread>0 ? `+${fmt(bSpread)} acima do custo` : 'Igual ao custo base';
+  el('bFatTotal').textContent = fmt(bFatTotal);
+  el('bCustoTotal').textContent = fmt(bCustoTotal);
+
+  // Banner
+  el('sb_base').textContent = fmt(bFatTotal);
+  el('sb_base_per').textContent = fmt(inValor) + ' por promotor';
+
+  // ── CLIENTE ──
+  const cSal = vc('c_sal','b_sal'), cIns = vc('c_ins','b_ins'), cPer = vc('c_per','b_per');
+  const cTotB = cSal + cIns + cPer;
+  el('cTotB').textContent = fmt(cTotB);
+
+  const cEnc = encargosFor(cTotB, regime);
+  // Mostrar encargos cliente como texto
+  (()=>{const _ex=el('cRowsC')?.querySelectorAll('.enc-input');if(!_ex||_ex.length!==cEnc.length){renderRows('cRowsC',cEnc,true);}else{cEnc.forEach(([,,v],i)=>{const _i=_ex[i];if(_i&&!_i.classList.contains('modified')){_i.value=v.toFixed(2);_i.dataset.default=v.toFixed(2);}});}})();
+  const cTotC = getEncSum('cRowsC') || rowsSum(cEnc);
+  el('cTotC').textContent = fmt(cTotC);
+  const cTotA = cTotB + cTotC;
+  el('cTotA').textContent = fmt(cTotA);
+
+  const DCAMPOS = ['vr','vt','bkof','pbi','cesta','sis','tel','doc','odonto','seg','bko','uni'];
+  const cTotD = DCAMPOS.reduce((s,k)=>s+vc('c_'+k,'b_'+k),0);
+  el('cTotD').textContent = fmt(cTotD);
+  const cTotAD = cTotA + cTotD;
+  el('cTotAD').textContent = fmt(cTotAD);
+
+  // Diffs D
+  DCAMPOS.forEach(k => {
+    const diff = el('d_'+k);
+    if (!diff) return;
+    const bv = vb('b_'+k), cv = vc('c_'+k,'b_'+k), d = cv - bv;
+    if (Math.abs(d) < 0.01) { diff.textContent = '—'; diff.className='dec-row-diff'; }
+    else { diff.textContent = (d>0?'+':'')+fmt(d); diff.className='dec-row-diff '+(d>0?'pos':'neg'); }
+  });
+  // Diffs salários
+  [['sal','b_sal'],['ins','b_ins'],['per','b_per']].forEach(([k,bk])=>{
+    const diff=el('d_'+k); if(!diff)return;
+    const d=vc('c_'+k,bk)-vb(bk);
+    if(Math.abs(d)<0.01){diff.textContent='—';diff.className='dec-row-diff';}
+    else{diff.textContent=(d>0?'+':'')+fmt(d);diff.className='dec-row-diff '+(d>0?'pos':'neg');}
+  });
+
+  const cFeePct = (parseFloat(el('c_fee_pct')?.value)||10)/100;
+  const cFeeRows = calcFeeRows(cTotAD, cFeePct, regime);
+  (()=>{const _ex=el('cRowsFee')?.querySelectorAll('.enc-input');if(!_ex||_ex.length!==cFeeRows.length){renderRows('cRowsFee',cFeeRows,true);}else{cFeeRows.forEach(([,,v],i)=>{const _i=_ex[i];if(_i&&!_i.classList.contains('modified')){_i.value=v.toFixed(2);_i.dataset.default=v.toFixed(2);}});}})();
+  const cTotEF = getEncSum('cRowsFee') || rowsSum(cFeeRows);
+  el('cTotEF').textContent = fmt(cTotEF);
+
+  // Diff fee
+  const dFee = el('d_fee');
+  if (dFee) {
+    const bFee = bTotAD*0.10, cFee=cTotAD*cFeePct, d=cFee-bFee;
+    dFee.textContent = Math.abs(d)<0.01?'—':(d>0?'+':'')+fmt(d);
+    dFee.className='dec-row-diff '+(d>=0?'pos':'neg');
+  }
+
+  const cCusto = cTotAD + cTotEF;
+  el('cTotGeral').textContent = fmt(cCusto);
+
+  // Valor cliente
+  let cValorProp = parseFloat(el('cValor')?.value);
+  if (!cValorProp || cValorProp <= 0) {
+    cValorProp = cCusto; // default = custo cliente sem spread adicional
+    if (el('cValorHint')) el('cValorHint').textContent = 'Deixe vazio para = custo. Adicione valor para spread extra.';
+  }
+
+  // Spread = custo cliente - custo base (os ajustes que o cliente vai pagar a mais)
+  const spreadPP = cCusto - bCusto;
+  const spreadTotal = spreadPP * promo;
+
+  el('cSpreadLabel').textContent = spreadPP>0 ? `+${fmt(spreadPP)} acima da base` : spreadPP<0 ? fmt(spreadPP)+' abaixo da base' : 'Igual à base';
+
+  // Banner cliente
+  const cliFatTotal = cCusto * promo;
+  el('sb_cli').textContent = fmt(cliFatTotal);
+  el('sb_cli_per').textContent = fmt(cCusto) + ' por promotor';
+}
+
+
+// ── SUBTOTAIS COM % ──
+function updateSubtotals(bSal, bTotC, bTotD, bTotEF, bCusto, promo) {
+  function setPct(id, val, base, label) {
+    const el2 = el(id);
+    if (!el2) return;
+    const pct = base > 0 ? (val/base*100).toFixed(1) : '0.0';
+    el2.textContent = label + ' · ' + pct + '% do custo total';
+  }
+  setPct('bPctB', bSal,   bCusto, 'Salários');
+  setPct('bPctC', bTotC,  bCusto, 'Encargos');
+  setPct('bPctD', bTotD,  bCusto, 'Benefícios');
+  setPct('bPctEF', bTotEF, bCusto, 'Fee + NF');
+}
+// ── TOGGLE SEC ──
+function toggleSec(sec){ sec.classList.toggle('open'); }
+
+// ── RESET BASE ──
+function resetBase() {
+  DEF_CAMPOS.forEach(k => { const e=el('b_'+k); if(e) e.value=DEF[k]; });
+  setRegime('s');
+}
+
+// ── SALVAR PADRÃO (FIREBASE) ──
+function salvarPadrao() {
+  const data = {};
+  DEF_CAMPOS.forEach(k => data[k] = vb('b_'+k));
+  data.regime = regime;
+  data.promo = parseInt(el('inPromo').value)||10;
+  data.valor = parseFloat(el('inValor').value)||5500;
+  localStorage.setItem('pdvq_calc_padrao', JSON.stringify(data));
+  if (fbDb) { fbDb.doc('painel_comercial/calc_padrao').set(data); }
+  const btn = document.querySelector('.btn-save');
+  const orig = btn.textContent; btn.textContent = '✅ Salvo!';
+  setTimeout(()=>{btn.textContent=orig;},2500);
+}
+
+// ── EXPORT EXCEL ──
+function exportExcel(tipo) {
+  const wb = XLSX.utils.book_new();
+  const promo = parseInt(el('inPromo').value)||1;
+  const rows = [
+    ['PDV Quality — Decupagem de Custos', tipo==='base'?'USO INTERNO':'PROPOSTA AO CLIENTE'],
+    [''],
+    ['Número de promotores', promo],
+    ['Regime tributário', regime==='s'?'Simples Nacional':'Lucro Real'],
+    [''],
+    ['ITEM', 'Valor por promotor (R$)', 'Total mensal (R$)'],
+  ];
+  const addRow = (lbl, id, cId) => {
+    const val = tipo==='cli' ? vc(cId||'',id) : vb(id);
+    rows.push([lbl, val.toFixed(2), (val*promo).toFixed(2)]);
+  };
+  const prefix = tipo==='cli' ? 'c' : 'b';
+  rows.push(['--- SALÁRIOS ---','','']);
+  addRow('Salário', 'b_sal', 'c_sal');
+  addRow('Insalubridade', 'b_ins', 'c_ins');
+  addRow('Periculosidade', 'b_per', 'c_per');
+  rows.push(['--- BENEFÍCIOS ---','','']);
+  [['Vale Refeição','vr'],['Vale Transporte','vt'],['Backoffice','bkof'],['Cesta Básica','cesta'],
+   ['Sistema','sis'],['Telefonia','tel'],['Documentações','doc'],['Odonto','odonto'],['Seg. Vida','seg'],['BKO','bko'],['Uniforme','uni']].forEach(([l,k])=>addRow(l,'b_'+k,'c_'+k));
+  rows.push(['']);
+  const custoPP = tipo==='cli' ? parseFloat(el('cTotGeral').textContent.replace(/[^0-9,]/g,'').replace(',','.')) : parseFloat(el('bTotGeral').textContent.replace(/[^0-9,]/g,'').replace(',','.'));
+  rows.push(['INVESTIMENTO MENSAL', '', custoPP.toFixed(2)]);
+  // Nota: dados de spread/margem interna NUNCA entram no Excel do cliente.
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, tipo==='base'?'Base Interna':'Proposta Cliente');
+  XLSX.writeFile(wb, tipo==='base'?'decupagem_base.xlsx':'proposta_cliente.xlsx');
+}
+
+// ── EXPORT PDF ──
+function exportPDF(tipo) {
+  // Elementos que mencionam "spread" e devem ficar fora de QUALQUER PDF exportado (interno ou cliente)
+  const spreadBox = document.getElementById('spreadBox');
+  const hintBox = document.querySelector('.dual-col.cli > div[style*="dashed"]');
+  const spreadBanner = document.querySelector('.spread-banner');
+  const cValorHint = document.getElementById('cValorHint');
+  const cSpreadLabel = document.getElementById('cSpreadLabel');
+  const bSpreadLabel = document.getElementById('bSpreadLabel');
+  const bSpreadRow = document.getElementById('bSpreadTotal')?.closest('.result-row');
+  const elementos = [spreadBox, hintBox, spreadBanner, cValorHint, cSpreadLabel, bSpreadLabel, bSpreadRow].filter(Boolean);
+  const diffsCliente = tipo!=='base' ? Array.from(document.querySelectorAll('#decCli .dec-row-diff')) : [];
+  elementos.forEach(el => el.style.display = 'none');
+  diffsCliente.forEach(el => el.style.display = 'none');
+
+  // Campos da coluna cliente que estão vazios (mostrando só o placeholder "= base") precisam
+  // ser preenchidos com o número real antes de imprimir — senão o PDF mostra "= base" em vez do valor.
+  const camposPreenchidos = [];
+  if (tipo!=='base') {
+    DEF_CAMPOS.forEach(k => {
+      const cInput = document.getElementById('c_'+k);
+      const bInput = document.getElementById('b_'+k);
+      if (cInput && bInput && cInput.value.trim()==='') {
+        cInput.value = bInput.value;
+        camposPreenchidos.push(cInput);
+      }
+    });
+  }
+
+  if (tipo==='base') {
+    document.getElementById('decCli').closest('.dual-col').style.display='none';
+    window.print();
+    document.getElementById('decCli').closest('.dual-col').style.display='';
+  } else {
+    document.getElementById('decBase').closest('.dual-col').style.display='none';
+    window.print();
+    document.getElementById('decBase').closest('.dual-col').style.display='';
+  }
+
+  camposPreenchidos.forEach(inp => inp.value = '');
+  diffsCliente.forEach(el => el.style.display = '');
+  elementos.forEach(el => el.style.display = '');
+}
+
+// ── CARREGAR PADRÃO ──
+(function() {
+  const saved = localStorage.getItem('pdvq_calc_padrao');
+  if (saved) {
+    try {
+      const p = JSON.parse(saved);
+      DEF_CAMPOS.forEach(k => { const e=el('b_'+k); if(e && p[k]!==undefined) e.value=p[k]; });
+      if (p.regime) regime = p.regime;
+      if (p.promo) el('inPromo').value = p.promo;
+      if (p.valor) el('inValor').value = p.valor;
+    } catch(e) {}
+  }
+  if (fbDb) {
+    fbDb.doc('painel_comercial/calc_padrao').get().then(d => {
+      if (d.exists) {
+        const p = d.data();
+        DEF_CAMPOS.forEach(k => { const e=el('b_'+k); if(e && p[k]!==undefined) e.value=p[k]; });
+        if (p.regime) regime = p.regime;
+        if (p.promo) el('inPromo').value = p.promo;
+        if (p.valor) el('inValor').value = p.valor;
+        calcAll();
+      }
+    });
+  }
+  setRegime(regime);
+})();
+</script>
+</body>
+</html>
