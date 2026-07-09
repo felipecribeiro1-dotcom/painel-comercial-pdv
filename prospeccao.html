@@ -103,7 +103,7 @@ function renderMetas(){
 function botoesPara(l){
   const b = [];
   const s = l.stage;
-  if(s==='pending_approval'){ b.push(['go','Aprovar + Enviar','aprovar']); b.push(['no','✕','rejeitar']); }
+  if(s==='pending_approval'){ b.push(['go','👁 Ver e-mail','preview']); b.push(['no','✕','rejeitar']); }
   if(s==='abordado'){ b.push(['go','Respondeu','mover:respondeu']); b.push(['no','Sem resposta ✕','mover:perdido']); }
   if(s==='respondeu'){ b.push(['go','Reunião marcada','mover:reuniao']); b.push(['no','Esfriou ✕','mover:perdido']); }
   if(s==='reuniao'){ b.push(['go','Proposta enviada','mover:proposta']); b.push(['no','Não avançou ✕','mover:perdido']); }
