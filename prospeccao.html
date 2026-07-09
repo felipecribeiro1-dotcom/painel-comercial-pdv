@@ -123,12 +123,26 @@ function renderBoard(){
         <div class="nm">${l.nome||'(sem nome)'}</div>
         <div class="emp">${l.empresa||''}${l.cargo?' · '+l.cargo:''}</div>
         <div class="toque ${atrasado?'atrasado':''}">${toques?`toque ${toques}/3`:'sem toque'}${dias!==null?` · há ${dias}d`:''}${atrasado?' · follow-up hoje 9h':''}</div>
-        <div class="acts">${botoesPara(l)}</div>
+        <div class="acts">${botoesPara(l)}${l.linkedin?`<button onclick="window.open('${l.linkedin}','_blank');registrarToque('${l._id}','linkedin')" title="Abrir LinkedIn e registrar toque">💼 LinkedIn</button>`:''}${l.telefone?`<button onclick="window.open('https://wa.me/55${(l.telefone||'').replace(/\D/g,'')}','_blank');registrarToque('${l._id}','whatsapp')" title="Abrir WhatsApp e registrar toque">📱 WhatsApp</button>`:''}</div>
       </div>`;
     }).join('') : `<div class="vazio">vazio</div>`;
     return `<div class="col"><div class="col-hdr" style="color:${est.cor}">${est.nome}<span class="qtd">${leads.length}</span></div>${cards}</div>`;
   }).join('');
   board.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>agir(btn.dataset.acao, btn.dataset.id)));
+}
+
+
+async function registrarToque(id, canal){
+  try{
+    const ref = db.collection('prospeccao_leads').doc(id);
+    const doc = await ref.get();
+    const l = doc.data();
+    await ref.update({
+      toques: (l.toques||0) + 1,
+      ultimo_toque: firebase.firestore.FieldValue.serverTimestamp(),
+      ultimo_canal: canal
+    });
+  }catch(e){}
 }
 
 async function agir(acao, id){
@@ -248,7 +262,7 @@ function abrirPreview(id) {
     const l = doc.data();
     _previewLeadId = id;
     document.getElementById('prevNome').textContent = l.nome + ' · ' + l.empresa;
-    document.getElementById('prevPara').textContent = '📧 ' + l.email;
+    document.getElementById('prevPara').textContent = l.email ? ('📧 ' + l.email + (l.email_verificado ? ' ✓ verificado' : '')) : '📧 e-mail será revelado ao confirmar (1 crédito Lusha)';
     document.getElementById('prevAssunto').textContent = l.email_assunto || '';
     document.getElementById('prevCorpo').innerHTML = l.email_corpo || '';
     document.getElementById('previewModal').style.display = '';
@@ -262,8 +276,26 @@ function abrirPreview(id) {
 async function aprovarLead(id){
   const ref = db.collection('prospeccao_leads').doc(id);
   const doc = await ref.get();
-  const lead = doc.data();
+  let lead = doc.data();
   try{
+    // Se o e-mail ainda não foi revelado (captura sem gasto de crédito), revela AGORA — só em lead aprovado
+    if((!lead.email || !lead.email_verificado) && lead.lusha_id){
+      const rr = await fetch('/.netlify/functions/revelar-email', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({lushaId: lead.lusha_id})
+      });
+      const rd = await rr.json().catch(()=>({}));
+      if(rr.ok && rd.email){
+        await ref.update({email: rd.email, email_verificado: true});
+        lead.email = rd.email;
+      } else if(rd.creditos_esgotados){
+        alert('Créditos Lusha esgotados — renova dia 20. Use LinkedIn/WhatsApp nesse lead por enquanto, ou aguarde.');
+        return;
+      } else if(!lead.email){
+        alert('Não consegui revelar o e-mail: '+(rd.error||'erro')+'. Lead sem e-mail — use o LinkedIn.');
+        return;
+      }
+    }
     const resp = await fetch('/.netlify/functions/send-email', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({to: lead.email, subject: lead.email_assunto || 'PDV Quality — presença da sua marca no PDV', html: lead.email_corpo || ''})
