@@ -272,12 +272,41 @@ const DEFAULT_TASKS = {
 function semanaAtual() {
   const d = new Date();
   d.setHours(0,0,0,0);
-  d.setDate(d.getDate() + 3 - (d.getDay()||7) + 1 - 3); // ajusta para segunda
+  const dow = d.getDay() || 7;
+  d.setDate(d.getDate() - dow + 1); // segunda-feira da semana atual
   const inicio = new Date(d.getFullYear(), 0, 1);
   const sem = Math.ceil(((d - inicio) / 86400000 + inicio.getDay() + 1) / 7);
   return `painel_comercial/planejamento_${d.getFullYear()}_w${String(sem).padStart(2,'0')}`;
 }
 const DOC_PLAN = semanaAtual();
+
+// Firebase próprio do planejamento — independente do iframe do relatório
+let _dbPlan = null;
+function getDbPlan() {
+  if (_dbPlan) return _dbPlan;
+  const cfg = {
+    apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+    authDomain: "painel-pdv-quality.firebaseapp.com",
+    projectId: "painel-pdv-quality"
+  };
+  // Reutiliza app existente ou cria novo
+  const app = firebase.apps.find(a=>a.name==='plan') || firebase.initializeApp(cfg, 'plan');
+  _dbPlan = firebase.firestore(app);
+  return _dbPlan;
+}
+async function fbSalvarPlan(path, data) {
+  try {
+    const db = getDbPlan();
+    await db.doc(path).set(data, {merge:true});
+  } catch(e) { console.warn('fbSalvarPlan erro:', e.message); }
+}
+async function fbCarregarPlan(path) {
+  try {
+    const db = getDbPlan();
+    const snap = await db.doc(path).get();
+    return snap.exists ? snap.data() : null;
+  } catch(e) { console.warn('fbCarregarPlan erro:', e.message); return null; }
+}
 let planState = { tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)), ceo: "", ceoUpdated: "" };
 let dragTask = null, dragFromDay = null, saveTimer = null;
 
@@ -286,19 +315,28 @@ function genId() { return "t_" + Math.random().toString(36).slice(2,8); }
 function planSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { fbSalvar(DOC_PLAN, { ...planState, updated: new Date().toISOString() }); } catch(e){}
+    fbSalvarPlan(DOC_PLAN, { ...planState, updated: new Date().toISOString() });
   }, 600);
 }
 
 async function planLoad() {
   try {
-    const snap = await fbCarregar(DOC_PLAN);
+    const snap = await fbCarregarPlan(DOC_PLAN);
     if (snap && snap.tasks) planState.tasks = snap.tasks;
     if (snap && snap.ceo !== undefined) planState.ceo = snap.ceo;
     if (snap && snap.ceoUpdated) planState.ceoUpdated = snap.ceoUpdated;
-  } catch(e) {}
+  } catch(e) { console.warn('planLoad:', e.message); }
   planRender();
 }
+
+// Label da semana no topo do kanban
+const _semLabel = (() => {
+  const d = new Date();
+  const dow = d.getDay() || 7;
+  const seg = new Date(d); seg.setDate(d.getDate() - dow + 1);
+  const sex = new Date(seg); sex.setDate(seg.getDate() + 4);
+  return `Semana ${seg.getDate()}/${seg.getMonth()+1} – ${sex.getDate()}/${sex.getMonth()+1}/${sex.getFullYear()}`;
+})();
 
 function planTaskCard(t, dayId) {
   const badge = t.badge === "hot"  ? '<span class="plan-badge b-hot">quente</span>' :
@@ -436,10 +474,8 @@ function planAddTask(day) {
   }, 80);
 }
 
-(function waitFb() {
-  if (window._fbReady) { planLoad(); }
-  else setTimeout(waitFb, 200);
-})();
+// Carrega o planejamento direto — não depende mais do _fbReady do iframe
+document.addEventListener('DOMContentLoaded', () => { planLoad(); });
 </script>
 
 </div>
