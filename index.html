@@ -57,6 +57,7 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -568,6 +569,85 @@ window.addEventListener('message', function(e) {
     }).catch(function(){});
   }
 });
+</script>
+
+
+<!-- ══ TELA DE LOGIN ══ -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0D1B2A 60%,#162236);display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.4)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:28px;font-weight:900;color:#0D1B2A">PDV <span style="color:#C9A84C">Quality</span></div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">Painel Comercial — Acesso Restrito</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:4px">E-MAIL</label>
+      <input id="loginEmail" type="email" placeholder="seu@email.com" style="width:100%;padding:10px 12px;border:1.5px solid #DDE3EE;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" />
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:4px">SENHA</label>
+      <input id="loginSenha" type="password" placeholder="••••••••" style="width:100%;padding:10px 12px;border:1.5px solid #DDE3EE;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')fazerLogin()" />
+    </div>
+    <div id="loginErro" style="display:none;background:#FEE2E2;color:#DC2626;font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>
+    <button onclick="fazerLogin()" id="loginBtn" style="width:100%;background:linear-gradient(135deg,#C9A84C,#B8934A);color:#1a1a1a;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:800;cursor:pointer">Entrar</button>
+    <div id="loginLoad" style="display:none;text-align:center;color:#94A3B8;font-size:12px;margin-top:10px">Verificando...</div>
+  </div>
+</div>
+
+<script>
+// ══ AUTENTICAÇÃO ══
+const _fbAuthCfg = {
+  apiKey: "AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",
+  authDomain: "painel-pdv-quality.firebaseapp.com",
+  projectId: "painel-pdv-quality"
+};
+const _authApp = firebase.apps.find(a=>a.name==='auth') || firebase.initializeApp(_fbAuthCfg,'auth');
+const _auth = firebase.auth(_authApp);
+
+const _painel = document.querySelector('.container, #app, body > div:not(#loginScreen)');
+
+function _mostrarLogin() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  if(_painel) _painel.style.display = 'none';
+}
+function _mostrarPainel() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.body.style.overflow = '';
+  if(_painel) _painel.style.display = '';
+}
+
+_auth.onAuthStateChanged(user => {
+  if (user) {
+    _mostrarPainel();
+  } else {
+    _mostrarLogin();
+  }
+});
+
+async function fazerLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const senha = document.getElementById('loginSenha').value;
+  const btn = document.getElementById('loginBtn');
+  const load = document.getElementById('loginLoad');
+  const erro = document.getElementById('loginErro');
+  erro.style.display = 'none';
+  btn.style.display = 'none';
+  load.style.display = 'block';
+  try {
+    await _auth.signInWithEmailAndPassword(email, senha);
+  } catch(e) {
+    const msgs = {
+      'auth/user-not-found': 'E-mail não encontrado.',
+      'auth/wrong-password': 'Senha incorreta.',
+      'auth/invalid-email': 'E-mail inválido.',
+      'auth/too-many-requests': 'Muitas tentativas. Tente novamente em alguns minutos.',
+    };
+    erro.textContent = msgs[e.code] || 'Erro ao entrar. Verifique suas credenciais.';
+    erro.style.display = 'block';
+    btn.style.display = 'block';
+    load.style.display = 'none';
+  }
+}
 </script>
 
 </body>
