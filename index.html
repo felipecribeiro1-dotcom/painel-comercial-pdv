@@ -209,7 +209,7 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 <div class="plan-header">
   <div>
     <div class="plan-title">Planejamento Comercial</div>
-    <div class="plan-semana">Semana de 23 a 27 de junho de 2026</div>
+    <div class="plan-semana" id="planSemanaLabel"></div>
   </div>
   <div class="plan-progress">
     <div class="plan-bar-wrap"><div class="plan-bar" id="planBar" style="width:0%"></div></div>
@@ -226,13 +226,28 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',sans-serif;backgro
 </div>
 
 <script>
-const PLAN_DAYS = [
-  { dia:"Segunda", date:"23 jun", id:"seg" },
-  { dia:"Terça",   date:"24 jun", id:"ter" },
-  { dia:"Quarta",  date:"25 jun", id:"qua" },
-  { dia:"Quinta",  date:"26 jun", id:"qui" },
-  { dia:"Sexta",   date:"27 jun", id:"sex" },
-];
+// Calcula os dias da semana atual dinamicamente
+const PLAN_DAYS = (function() {
+  const hoje = new Date();
+  const dow = hoje.getDay() || 7; // 1=seg ... 7=dom
+  const seg = new Date(hoje);
+  seg.setDate(hoje.getDate() - dow + 1);
+  seg.setHours(0,0,0,0);
+  const NOMES = ['Segunda','Terça','Quarta','Quinta','Sexta'];
+  const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  return NOMES.map((nome, i) => {
+    const d = new Date(seg);
+    d.setDate(seg.getDate() + i);
+    return { dia: nome, date: `${d.getDate()} ${MESES[d.getMonth()]}`, id: ['seg','ter','qua','qui','sex'][i] };
+  });
+})();
+
+// Label do header
+(function() {
+  const seg = PLAN_DAYS[0], sex = PLAN_DAYS[4];
+  const el = document.getElementById('planSemanaLabel');
+  if(el) el.textContent = `Semana de ${seg.date} a ${sex.date} de ${new Date().getFullYear()}`;
+})();
 
 const TIPO_LABEL = { prop:"Proposta", reun:"Reunião", pros:"Prospecção", prod:"Produção", vis:"Campo" };
 const TIPO_CLS   = { prop:"tp-prop", reun:"tp-reun", pros:"tp-pros", prod:"tp-prod", vis:"tp-vis" };
