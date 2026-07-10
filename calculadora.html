@@ -577,7 +577,8 @@ function calcAll() {
   const spreadGestorValor = el('spreadGestorValor');
   const spreadHint = el('spreadHint');
   if(spreadGestorValor){
-    spreadGestorValor.textContent = bSpread > 0 ? `R$ ${fmt(bSpread)}` : `R$ 0,00`;
+    const n = bSpread > 0 ? bSpread : 0;
+    spreadGestorValor.textContent = fmt(n); // fmt já inclui "R$ "
     const cor = bSpread > 0 ? '#4ade80' : bSpread < 0 ? '#f87171' : '#C9A84C';
     spreadGestorValor.style.color = cor;
   }
