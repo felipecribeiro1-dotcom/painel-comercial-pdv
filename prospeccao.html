@@ -108,6 +108,7 @@ function botoesPara(l){
   if(s==='respondeu'){ b.push(['go','Reunião marcada','mover:reuniao']); b.push(['no','Esfriou ✕','mover:perdido']); }
   if(s==='reuniao'){ b.push(['go','Proposta enviada','mover:proposta']); b.push(['no','Não avançou ✕','mover:perdido']); }
   if(s==='proposta'){ b.push(['go','FECHOU! 🎉','mover:fechado']); b.push(['no','Perdeu ✕','mover:perdido']); }
+  b.push(['no','🗑','excluir']);
   return b.map(([cls,txt,acao])=>`<button class="${cls}" data-acao="${acao}" data-id="${l._id}">${txt}</button>`).join('');
 }
 
@@ -249,6 +250,7 @@ db.collection('prospeccao_leads').doc(id);
   if(acao==='aprovar'){ await aprovarLead(id); return; }
   if(acao==='preview'){ abrirPreview(id); return; }
   if(acao==='rejeitar'){ await ref.update({stage:'rejected'}); return; }
+  if(acao==='excluir'){ if(confirm('Excluir este lead definitivamente?')) await ref.delete(); return; }
   if(acao.startsWith('mover:')){
     const novo = acao.split(':')[1];
     await ref.update({stage:novo, ultimo_toque: firebase.firestore.FieldValue.serverTimestamp()});
