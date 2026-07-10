@@ -584,8 +584,9 @@ function calcAll() {
   }
   if(spreadHint){
     const total = bSpread * promo;
+    // fmt() já retorna "R$ X.XXX,XX" — não adicionar "R$ " antes
     spreadHint.textContent = bSpread > 0
-      ? `R$ ${fmt(bSpread)}/promotor · R$ ${fmt(total)}/mês · margem ${((bSpread/inValor)*100).toFixed(1)}%`
+      ? `${fmt(bSpread)}/promotor · ${fmt(total)}/mês · margem ${((bSpread/inValor)*100).toFixed(1)}%`
       : bSpread < 0
       ? `⚠️ Custo (${fmt(bCusto)}) acima do cobrado (${fmt(inValor)}) — operação no negativo!`
       : `Custo igual ao valor cobrado — sem margem`;
