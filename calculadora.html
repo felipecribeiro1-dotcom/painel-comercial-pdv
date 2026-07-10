@@ -568,29 +568,12 @@ function calcAll() {
   el('bTotGeral').textContent = fmt(bCusto);
 
   const inValor = vb('inValor');
-  // Spread automático: diferença entre o que o cliente paga e o custo interno real
-  const bSpread = Math.max(0, inValor - bCusto);
+  const bSpread = Math.max(0, inValor - bCusto); // mantido para bSpreadLabel interno
   const bFatTotal = inValor * promo;
   const bCustoTotal = bCusto * promo;
 
-  // Atualiza o card de spread do gestor
-  const spreadGestorValor = el('spreadGestorValor');
-  const spreadHint = el('spreadHint');
-  if(spreadGestorValor){
-    const n = bSpread > 0 ? bSpread : 0;
-    spreadGestorValor.textContent = fmt(n); // fmt já inclui "R$ "
-    const cor = bSpread > 0 ? '#4ade80' : bSpread < 0 ? '#f87171' : '#C9A84C';
-    spreadGestorValor.style.color = cor;
-  }
-  if(spreadHint){
-    const total = bSpread * promo;
-    // fmt() já retorna "R$ X.XXX,XX" — não adicionar "R$ " antes
-    spreadHint.textContent = bSpread > 0
-      ? `${fmt(bSpread)}/promotor · ${fmt(total)}/mês · margem ${((bSpread/inValor)*100).toFixed(1)}%`
-      : bSpread < 0
-      ? `⚠️ Custo (${fmt(bCusto)}) acima do cobrado (${fmt(inValor)}) — operação no negativo!`
-      : `Custo igual ao valor cobrado — sem margem`;
-  }
+  // Card spread: será atualizado ao final pelo bloco da coluna cliente
+  // (spread real = total cliente − total base)
 
   // Subtotais %
   const bSalBase = bTotB;
@@ -679,6 +662,24 @@ function calcAll() {
   const cliFatTotal = cCusto * promo;
   el('sb_cli').textContent = fmt(cliFatTotal);
   el('sb_cli_per').textContent = fmt(cCusto) + ' por promotor';
+
+  // Spread automático = Total Cliente − Total Base (qualquer alteração na coluna cliente reflete aqui)
+  const spreadReal = cliFatTotal - bFatTotal;
+  const spreadPorPromotor = spreadReal / promo;
+  const spreadGestorValor = el('spreadGestorValor');
+  const spreadHint = el('spreadHint');
+  if(spreadGestorValor){
+    spreadGestorValor.textContent = fmt(Math.abs(spreadPorPromotor));
+    spreadGestorValor.style.color = spreadReal > 0 ? '#4ade80' : spreadReal < 0 ? '#f87171' : '#C9A84C';
+  }
+  if(spreadHint){
+    if(spreadReal > 0)
+      spreadHint.textContent = `${fmt(spreadPorPromotor)}/promotor · ${fmt(spreadReal)}/mês · margem ${((spreadReal/cliFatTotal)*100).toFixed(1)}%`;
+    else if(spreadReal < 0)
+      spreadHint.textContent = `⚠️ Proposta (${fmt(cliFatTotal)}) abaixo do custo (${fmt(bFatTotal)}) — negativo!`;
+    else
+      spreadHint.textContent = `Proposta igual ao custo interno — sem margem`;
+  }
 }
 
 
