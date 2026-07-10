@@ -199,6 +199,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);m
         </div>
         <div class="promo-hint" id="valorPadraoHint">Fatura mensal por promotor · incluso no padrão salvo</div>
       </div>
+      <!-- Campo de spread do gestor: visível APENAS internamente. NÃO aparece no PDF/impressão do cliente. -->
+      <div class="promo-card" id="spreadGestorCard" style="border:1.5px solid rgba(201,168,76,.4);background:rgba(201,168,76,.06)">
+        <div class="promo-label" style="color:#C9A84C">💰 Spread do gestor (interno)</div>
+        <div class="promo-wrap">
+          <span class="promo-prefix">R$</span>
+          <input class="promo-input" type="number" id="inSpread" value="0" min="0" step="50" oninput="calcAll()" style="color:#C9A84C">
+        </div>
+        <div class="promo-hint" style="color:#C9A84C" id="spreadHint">Adicionado ao custo interno · invisível no material do cliente</div>
+      </div>
     </div>
 
     <!-- Decupagem Base -->
@@ -558,10 +567,20 @@ function calcAll() {
   const bCusto = bTotAD + bTotEF;
   el('bTotGeral').textContent = fmt(bCusto);
 
+  // Spread do gestor: adicionado ao custo real (base), não ao valor cobrado
+  // O cliente vê o mesmo valor cobrado (inValor), mas o gestor enxerga o spread líquido descontado
+  const inSpread = vb('inSpread') || 0;
+  const bCustoComSpread = bCusto + inSpread; // custo real (interno) com o spread somado
   const inValor = vb('inValor');
-  const bSpread = Math.max(0, inValor - bCusto);
+  const bSpread = Math.max(0, inValor - bCustoComSpread); // spread líquido real do gestor
   const bFatTotal = inValor * promo;
-  const bCustoTotal = bCusto * promo;
+  const bCustoTotal = bCustoComSpread * promo;
+
+  // Atualiza o hint do spread com o total mensal
+  const spreadHint = el('spreadHint');
+  if(spreadHint && inSpread > 0) {
+    spreadHint.textContent = `R$ ${fmt(inSpread)}/promotor · R$ ${fmt(inSpread*promo)}/mês total · invisível no cliente`;
+  }
 
   // Subtotais %
   const bSalBase = bTotB;
@@ -732,7 +751,9 @@ function exportPDF(tipo) {
   const cSpreadLabel = document.getElementById('cSpreadLabel');
   const bSpreadLabel = document.getElementById('bSpreadLabel');
   const bSpreadRow = document.getElementById('bSpreadTotal')?.closest('.result-row');
-  const elementos = [spreadBox, hintBox, spreadBanner, cValorHint, cSpreadLabel, bSpreadLabel, bSpreadRow].filter(Boolean);
+  const elementos = [spreadBox, hintBox, spreadBanner, cValorHint, cSpreadLabel, bSpreadLabel, bSpreadRow,
+    document.getElementById('spreadGestorCard') // spread interno: NUNCA vai para o cliente
+  ].filter(Boolean);
   const diffsCliente = tipo!=='base' ? Array.from(document.querySelectorAll('#decCli .dec-row-diff')) : [];
   elementos.forEach(el => el.style.display = 'none');
   diffsCliente.forEach(el => el.style.display = 'none');
