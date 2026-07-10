@@ -146,8 +146,6 @@ async function registrarToque(id, canal){
   }catch(e){}
 }
 
-async function agir(acao, id){
-  const ref = 
 async function lerEmailsEnviados() {
   const btn = document.querySelector('button[onclick="lerEmailsEnviados()"]');
   if(btn){ btn.textContent = '⏳ Lendo Outlook...'; btn.disabled = true; }
@@ -246,7 +244,8 @@ function renderEmailsEnviados(emails) {
   } catch(e) {}
 })();
 
-db.collection('prospeccao_leads').doc(id);
+async function agir(acao, id){
+  const ref = db.collection('prospeccao_leads').doc(id);
   if(acao==='aprovar'){ await aprovarLead(id); return; }
   if(acao==='preview'){ abrirPreview(id); return; }
   if(acao==='rejeitar'){ await ref.update({stage:'rejected'}); return; }
