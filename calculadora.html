@@ -202,11 +202,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);m
       <!-- Spread do gestor: calculado automaticamente (valor cliente − custo interno). Invisível no PDF. -->
       <div class="promo-card" id="spreadGestorCard" style="border:1.5px solid rgba(201,168,76,.4);background:rgba(201,168,76,.06)">
         <div class="promo-label" style="color:#C9A84C">💰 Spread do gestor (automático)</div>
-        <div style="display:flex;align-items:baseline;gap:6px;margin:6px 0">
-          <span style="font-size:28px;font-weight:900;color:#C9A84C;font-family:'DM Serif Display',serif" id="spreadGestorValor">R$ —</span>
-          <span style="font-size:12px;color:#C9A84C;opacity:.7">/promotor</span>
+        <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0 2px">
+          <span style="font-size:32px;font-weight:900;font-family:'DM Serif Display',serif" id="spreadGestorValor">R$ —</span>
+          <span style="font-size:11px;color:#C9A84C;opacity:.6">/mês</span>
         </div>
-        <div class="promo-hint" style="color:#C9A84C" id="spreadHint">Valor cliente − custo interno · invisível no material do cliente</div>
+        <div id="spreadHint" style="font-size:11px;color:#C9A84C;opacity:.8">Total cliente − total interno · invisível no cliente</div>
+        <div id="spreadHintPP" style="font-size:10px;color:#C9A84C;opacity:.55;margin-top:2px"></div>
       </div>
     </div>
 
@@ -669,17 +670,20 @@ function calcAll() {
   const spreadGestorValor = el('spreadGestorValor');
   const spreadHint = el('spreadHint');
   if(spreadGestorValor){
-    spreadGestorValor.textContent = fmt(Math.abs(spreadPorPromotor));
+    spreadGestorValor.textContent = fmt(Math.abs(spreadReal));
     spreadGestorValor.style.color = spreadReal > 0 ? '#4ade80' : spreadReal < 0 ? '#f87171' : '#C9A84C';
   }
   if(spreadHint){
     if(spreadReal > 0)
-      spreadHint.textContent = `${fmt(spreadPorPromotor)}/promotor · ${fmt(spreadReal)}/mês · margem ${((spreadReal/cliFatTotal)*100).toFixed(1)}%`;
+      spreadHint.textContent = `${fmt(spreadReal)}/mês · margem ${((spreadReal/cliFatTotal)*100).toFixed(1)}%`;
     else if(spreadReal < 0)
-      spreadHint.textContent = `⚠️ Proposta (${fmt(cliFatTotal)}) abaixo do custo (${fmt(bFatTotal)}) — negativo!`;
+      spreadHint.textContent = `⚠️ Proposta abaixo do custo — negativo!`;
     else
-      spreadHint.textContent = `Proposta igual ao custo interno — sem margem`;
+      spreadHint.textContent = `Proposta igual ao custo — sem margem`;
   }
+  const spreadHintPP = el('spreadHintPP');
+  if(spreadHintPP && spreadReal !== 0)
+    spreadHintPP.textContent = `${fmt(spreadPorPromotor)}/promotor`;
 }
 
 
