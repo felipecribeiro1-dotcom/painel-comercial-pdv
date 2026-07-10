@@ -244,6 +244,40 @@ function renderEmailsEnviados(emails) {
   } catch(e) {}
 })();
 
+
+function entrarModoEdicao(){
+  document.getElementById('modoVer').style.display='none';
+  document.getElementById('modoEditar').style.display='';
+  document.getElementById('prevModo').textContent='EDIÇÃO';
+  document.getElementById('editAssunto').value = document.getElementById('prevAssunto').textContent;
+  // Converte HTML para texto editável (simplificado) — mostra o HTML cru
+  document.getElementById('editCorpo').value = (document.getElementById('prevCorpo').innerHTML||'').trim();
+}
+
+function sairModoEdicao(){
+  document.getElementById('modoVer').style.display='';
+  document.getElementById('modoEditar').style.display='none';
+  document.getElementById('prevModo').textContent='VISUALIZAÇÃO';
+}
+
+async function salvarEdicao(){
+  const novoAssunto = document.getElementById('editAssunto').value.trim();
+  const novoCorpo = document.getElementById('editCorpo').value.trim();
+  if(!novoAssunto || !novoCorpo) return alert('Preencha assunto e corpo.');
+  const ref = db.collection('prospeccao_leads').doc(_previewLeadId);
+  await ref.update({email_assunto: novoAssunto, email_corpo: novoCorpo});
+  // Atualiza a visualização
+  document.getElementById('prevAssunto').textContent = novoAssunto;
+  document.getElementById('prevCorpo').innerHTML = novoCorpo;
+  sairModoEdicao();
+}
+
+async function salvarEEnviar(){
+  await salvarEdicao();
+  document.getElementById('previewModal').style.display='none';
+  await aprovarLead(_previewLeadId);
+}
+
 async function agir(acao, id){
   const ref = db.collection('prospeccao_leads').doc(id);
   if(acao==='aprovar'){ await aprovarLead(id); return; }
@@ -328,22 +362,50 @@ db.collection('prospeccao_leads').orderBy('criado_em','desc').limit(300).onSnaps
 
 
 <div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow:auto;padding:20px">
-  <div style="background:#fff;max-width:680px;margin:auto;border-radius:12px;overflow:hidden">
+  <div style="background:#fff;max-width:700px;margin:auto;border-radius:12px;overflow:hidden">
+    <!-- Header -->
     <div style="background:#0D1B2A;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
       <div>
         <div style="color:#C9A84C;font-weight:800;font-size:13px" id="prevNome"></div>
         <div style="color:rgba(255,255,255,.5);font-size:11px" id="prevPara"></div>
       </div>
-      <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">✕ Fechar</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="prevModo" style="font-size:10px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px">VISUALIZAÇÃO</span>
+        <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">✕</button>
+      </div>
     </div>
-    <div style="padding:16px 20px;background:#F8F9FA;border-bottom:1px solid #e5e7eb">
-      <div style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Assunto</div>
-      <div id="prevAssunto" style="font-size:13px;font-weight:700;color:#111827"></div>
+
+    <!-- Modo VISUALIZAÇÃO -->
+    <div id="modoVer">
+      <div style="padding:16px 20px;background:#F8F9FA;border-bottom:1px solid #e5e7eb">
+        <div style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Assunto</div>
+        <div id="prevAssunto" style="font-size:13px;font-weight:700;color:#111827"></div>
+      </div>
+      <div id="prevCorpo" style="padding:24px;font-size:13px;line-height:1.7;color:#111827;min-height:120px"></div>
+      <div style="padding:14px 20px;background:#F8F9FA;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="entrarModoEdicao()" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">✏️ Editar</button>
+        <button id="btnEnviarConfirm" style="background:linear-gradient(135deg,#C9A84C,#B8934A);border:none;color:#1a1a1a;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer">✅ Confirmar e Enviar</button>
+      </div>
     </div>
-    <div id="prevCorpo" style="padding:24px;font-size:13px;line-height:1.7;color:#111827"></div>
-    <div style="padding:14px 20px;background:#F8F9FA;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
-      <button onclick="document.getElementById('previewModal').style.display='none'" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">✏️ Editar</button>
-      <button id="btnEnviarConfirm" style="background:linear-gradient(135deg,#C9A84C,#B8934A);border:none;color:#1a1a1a;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer">✅ Confirmar e Enviar</button>
+
+    <!-- Modo EDIÇÃO -->
+    <div id="modoEditar" style="display:none">
+      <div style="padding:16px 20px;background:#FFF8E7;border-bottom:1px solid #fde68a">
+        <div style="font-size:10px;color:#92400E;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Assunto</div>
+        <input id="editAssunto" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #fbbf24;border-radius:6px;font-size:13px;font-weight:600;box-sizing:border-box;outline:none">
+      </div>
+      <div style="padding:16px 20px">
+        <div style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Corpo do e-mail</div>
+        <textarea id="editCorpo" rows="12" style="width:100%;padding:10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px;line-height:1.6;box-sizing:border-box;outline:none;font-family:Georgia,serif;resize:vertical"></textarea>
+        <div style="font-size:10px;color:#94A3B8;margin-top:4px">Você pode usar HTML básico (negrito: &lt;b&gt;texto&lt;/b&gt;, quebra de linha: &lt;br&gt;)</div>
+      </div>
+      <div style="padding:14px 20px;background:#F8F9FA;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:space-between">
+        <button onclick="sairModoEdicao()" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">← Cancelar</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="salvarEdicao()" style="background:#3B82F6;border:none;color:#fff;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">💾 Salvar rascunho</button>
+          <button onclick="salvarEEnviar()" style="background:linear-gradient(135deg,#C9A84C,#B8934A);border:none;color:#1a1a1a;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer">✅ Salvar e Enviar</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
