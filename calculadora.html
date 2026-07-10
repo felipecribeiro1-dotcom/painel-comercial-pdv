@@ -199,14 +199,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);m
         </div>
         <div class="promo-hint" id="valorPadraoHint">Fatura mensal por promotor · incluso no padrão salvo</div>
       </div>
-      <!-- Campo de spread do gestor: visível APENAS internamente. NÃO aparece no PDF/impressão do cliente. -->
+      <!-- Spread do gestor: calculado automaticamente (valor cliente − custo interno). Invisível no PDF. -->
       <div class="promo-card" id="spreadGestorCard" style="border:1.5px solid rgba(201,168,76,.4);background:rgba(201,168,76,.06)">
-        <div class="promo-label" style="color:#C9A84C">💰 Spread do gestor (interno)</div>
-        <div class="promo-wrap">
-          <span class="promo-prefix">R$</span>
-          <input class="promo-input" type="number" id="inSpread" value="0" min="0" step="50" oninput="calcAll()" style="color:#C9A84C">
+        <div class="promo-label" style="color:#C9A84C">💰 Spread do gestor (automático)</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin:6px 0">
+          <span style="font-size:28px;font-weight:900;color:#C9A84C;font-family:'DM Serif Display',serif" id="spreadGestorValor">R$ —</span>
+          <span style="font-size:12px;color:#C9A84C;opacity:.7">/promotor</span>
         </div>
-        <div class="promo-hint" style="color:#C9A84C" id="spreadHint">Adicionado ao custo interno · invisível no material do cliente</div>
+        <div class="promo-hint" style="color:#C9A84C" id="spreadHint">Valor cliente − custo interno · invisível no material do cliente</div>
       </div>
     </div>
 
@@ -567,19 +567,27 @@ function calcAll() {
   const bCusto = bTotAD + bTotEF;
   el('bTotGeral').textContent = fmt(bCusto);
 
-  // Spread do gestor: adicionado ao custo real (base), não ao valor cobrado
-  // O cliente vê o mesmo valor cobrado (inValor), mas o gestor enxerga o spread líquido descontado
-  const inSpread = vb('inSpread') || 0;
-  const bCustoComSpread = bCusto + inSpread; // custo real (interno) com o spread somado
   const inValor = vb('inValor');
-  const bSpread = Math.max(0, inValor - bCustoComSpread); // spread líquido real do gestor
+  // Spread automático: diferença entre o que o cliente paga e o custo interno real
+  const bSpread = Math.max(0, inValor - bCusto);
   const bFatTotal = inValor * promo;
-  const bCustoTotal = bCustoComSpread * promo;
+  const bCustoTotal = bCusto * promo;
 
-  // Atualiza o hint do spread com o total mensal
+  // Atualiza o card de spread do gestor
+  const spreadGestorValor = el('spreadGestorValor');
   const spreadHint = el('spreadHint');
-  if(spreadHint && inSpread > 0) {
-    spreadHint.textContent = `R$ ${fmt(inSpread)}/promotor · R$ ${fmt(inSpread*promo)}/mês total · invisível no cliente`;
+  if(spreadGestorValor){
+    spreadGestorValor.textContent = bSpread > 0 ? `R$ ${fmt(bSpread)}` : `R$ 0,00`;
+    const cor = bSpread > 0 ? '#4ade80' : bSpread < 0 ? '#f87171' : '#C9A84C';
+    spreadGestorValor.style.color = cor;
+  }
+  if(spreadHint){
+    const total = bSpread * promo;
+    spreadHint.textContent = bSpread > 0
+      ? `R$ ${fmt(bSpread)}/promotor · R$ ${fmt(total)}/mês · margem ${((bSpread/inValor)*100).toFixed(1)}%`
+      : bSpread < 0
+      ? `⚠️ Custo (${fmt(bCusto)}) acima do cobrado (${fmt(inValor)}) — operação no negativo!`
+      : `Custo igual ao valor cobrado — sem margem`;
   }
 
   // Subtotais %
