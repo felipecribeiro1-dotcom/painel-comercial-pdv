@@ -435,33 +435,49 @@ function setorizar(pontos, k){
   return grupos.filter(g=>g.length);
 }
 
-// Monta os dias de rota de UM setor, ancorados na base (casa do promotor ou centroide)
-function montarDiasDoSetor(visitas, hVis, base){
-  const pendentes=[...visitas];
-  const dias=[];
-  while(pendentes.length){
-    // semente = visita mais próxima da BASE (o dia começa perto de casa)
-    let si=0,sd=Infinity;
-    pendentes.forEach((v,i)=>{const d=hav(base.lat,base.lng,v.lat,v.lng);if(d<sd){sd=d;si=i;}});
-    let rota=[pendentes.splice(si,1)[0]];
-    const noDia=new Set([rota[0].id]);
-    let cresceu=true;
-    while(cresceu&&pendentes.length){
-      cresceu=false;
-      const ult=rota[rota.length-1];
-      const cands=pendentes.map((v,i)=>({v,i,d:noDia.has(v.id)?Infinity:hav(ult.lat,ult.lng,v.lat,v.lng)}))
-        .filter(x=>x.d<Infinity).sort((a,b)=>a.d-b.d).slice(0,5);
-      for(const cd of cands){
-        const t=tempoRotaCom(rota,cd.v);
-        if(t.total<=hVis+1e-9){rota=t.rota;noDia.add(cd.v.id);pendentes.splice(cd.i,1);cresceu=true;break;}
-      }
-    }
-    rota=tspExato(rota);
-    const m=metricasRota(rota);
-    dias.push({vis:rota,h:m.hVisita,hDesl:m.hDesl,km:m.km,
-      clat:rota.reduce((s,v)=>s+v.lat,0)/rota.length,clng:rota.reduce((s,v)=>s+v.lng,0)/rota.length});
+// Monta EXATAMENTE `nDias` dias equalizados: cadeia vizinho-mais-próximo a partir da base,
+// cortada em segmentos de carga (visita+desloc) equivalente. Todos os dias da semana trabalhados.
+function montarDiasDoSetor(visitas, hVis, base, nDias){
+  if(!visitas.length) return {dias:[],overflow:false};
+  // cadeia NN a partir da base
+  const pend=[...visitas]; const chain=[];
+  let cur=base;
+  while(pend.length){
+    let bi=0,bd=Infinity;
+    pend.forEach((v,i)=>{const d=hav(cur.lat,cur.lng,v.lat,v.lng);if(d<bd){bd=d;bi=i;}});
+    const v=pend.splice(bi,1)[0]; chain.push(v); cur=v;
   }
-  return dias;
+  // corta em nDias segmentos por carga
+  const cargaDe=(arr)=>{const m=metricasRota(arr);return m.hVisita+m.hDesl;};
+  const total=cargaDe(chain);
+  const alvo=total/nDias;
+  const dias=[]; let seg=[];
+  for(const v of chain){
+    seg.push(v);
+    if(dias.length<nDias-1 && cargaDe(seg)>=alvo){ dias.push(seg); seg=[]; }
+  }
+  if(seg.length) dias.push(seg);
+  while(dias.length<nDias) dias.push([]);
+  // mesma loja 2x no mesmo dia → empurra pro dia mais leve sem ela
+  dias.forEach((d,di)=>{
+    const vistos=new Set();
+    for(let i=d.length-1;i>=0;i--){
+      if(vistos.has(d[i].id)){
+        const alvoDia=dias.filter((x,xi)=>xi!==di&&!x.some(v=>v.id===d[i].id))
+          .sort((a,b)=>cargaDe(a)-cargaDe(b))[0];
+        if(alvoDia) alvoDia.push(d.splice(i,1)[0]); else d.splice(i,1);
+      } else vistos.add(d[i].id);
+    }
+  });
+  let overflow=false;
+  const out=dias.map(d=>{
+    const rota=tspExato(d); const m=metricasRota(rota);
+    if(m.hVisita+m.hDesl>hVis+0.25) overflow=true;
+    return {vis:rota,h:m.hVisita,hDesl:m.hDesl,km:m.km,
+      clat:rota.length?rota.reduce((s,v)=>s+v.lat,0)/rota.length:base.lat,
+      clng:rota.length?rota.reduce((s,v)=>s+v.lng,0)/rota.length:base.lng};
+  });
+  return {dias:out,overflow};
 }
 
 // DIA SEMPRE CHEIO: preenche a folga da jornada com visitas de reforço nas lojas mais próximas do dia
@@ -472,7 +488,7 @@ function preencherDias(dias, todasLojas, hVis){
       const folga=hVis-(d.h+d.hDesl);
       if(folga<=0.2)break;
       const idsNoDia=new Set(d.vis.map(v=>v.id));
-      const ult=d.vis[d.vis.length-1];
+      const ult=d.vis[d.vis.length-1]; if(!ult)break;
       // loja mais próxima do fim do dia que caiba na folga
       let melhor=null,bd=Infinity;
       todasLojas.forEach(l=>{
@@ -542,38 +558,25 @@ async function gerar(){
   let setores,diasPorSetor,ok=false,guard=0;
   while(!ok&&guard++<15){
     setores=setorizar(visitas,nP);
+    // rebalanceia carga entre setores: move a loja da borda do mais pesado pro mais leve
+    const horasDe=s=>s.reduce((t,v)=>t+v.tempo,0);
+    for(let r=0;r<40&&setores.length>1;r++){
+      setores.sort((a,b)=>horasDe(b)-horasDe(a));
+      const pesado=setores[0], leve=setores[setores.length-1];
+      if(horasDe(pesado)-horasDe(leve)<Math.max(...pesado.map(v=>v.tempo))*1.2)break;
+      const cLeve={lat:leve.reduce((s,v)=>s+v.lat,0)/leve.length,lng:leve.reduce((s,v)=>s+v.lng,0)/leve.length};
+      let bi=0,bd=Infinity;
+      pesado.forEach((v,i)=>{const d=hav(v.lat,v.lng,cLeve.lat,cLeve.lng);if(d<bd){bd=d;bi=i;}});
+      leve.push(pesado.splice(bi,1)[0]);
+    }
     diasPorSetor=setores.map(st=>{
       const cent={lat:st.reduce((s,v)=>s+v.lat,0)/st.length,lng:st.reduce((s,v)=>s+v.lng,0)/st.length};
-      return {cent,dias:montarDiasDoSetor(st,hVis,cent)};
+      const r=montarDiasDoSetor(st,hVis,cent,dias);
+      return {cent,dias:r.dias,overflow:r.overflow};
     });
-    ok=diasPorSetor.every(s=>s.dias.length<=dias);
+    ok=diasPorSetor.every(s=>!s.overflow);
     if(!ok)nP++;
   }
-
-  // CONSOLIDAÇÃO DE SETORES: funde setores vizinhos subutilizados enquanto os dias couberem na semana
-  let fundiuSetor=true;
-  while(fundiuSetor&&setores.length>1){
-    fundiuSetor=false;
-    outer:
-    for(let i=0;i<setores.length;i++){
-      for(let j=i+1;j<setores.length;j++){
-        if(diasPorSetor[i].dias.length+diasPorSetor[j].dias.length>dias+2)continue; // pré-filtro folgado: a reconstrução decide
-        // trava geográfica: só funde setores VIZINHOS (≤12km entre centroides) — território > ocupação
-        if(hav(diasPorSetor[i].cent.lat,diasPorSetor[i].cent.lng,diasPorSetor[j].cent.lat,diasPorSetor[j].cent.lng)>12)continue;
-        const comb=[...setores[i],...setores[j]];
-        const cent={lat:comb.reduce((s,v)=>s+v.lat,0)/comb.length,lng:comb.reduce((s,v)=>s+v.lng,0)/comb.length};
-        const ds=montarDiasDoSetor(comb,hVis,cent);
-        if(ds.length<=dias){
-          setores[i]=comb; diasPorSetor[i]={cent,dias:ds};
-          setores.splice(j,1); diasPorSetor.splice(j,1);
-          fundiuSetor=true;
-          break outer;
-        }
-      }
-    }
-  }
-  nP=setores.length;
-
   // 3) Atribui promotor ao setor MAIS PRÓXIMO da casa dele
   const atribuicao=[];
   const setoresLivres=diasPorSetor.map((s,i)=>i);
@@ -592,11 +595,11 @@ async function gerar(){
   const proms=atribuicao.map((a,i)=>{
     const st=setores[a.setor];
     const anc=a.base||diasPorSetor[a.setor].cent; // sem casa → região fixa = centroide do setor
-    const ds=montarDiasDoSetor(st,hVis,anc);
+    const ds=montarDiasDoSetor(st,hVis,anc,dias).dias;
     preencherDias(ds,stores.filter(l=>st.some(v=>v.id===l.id)),hVis);
     const p={id:i,nome:a.base?a.base.nome:('Promotor '+(i+1)),baseNome:a.base?a.base.endereco:'centro do setor',
       vis:[],hT:0,kmT:0,hDeslT:0,dias:Array.from({length:dias},()=>({vis:[],h:0,hDesl:0,km:0}))};
-    ds.slice(0,dias).forEach((d,di)=>{
+    ds.forEach((d,di)=>{ if(di>=dias)return;
       p.dias[di]=d;
       p.vis.push(...d.vis);
       p.hT+=d.h;p.kmT+=d.km;p.hDeslT+=d.hDesl;
@@ -620,11 +623,39 @@ async function gerar(){
 
 function autoR(){if(rData&&stores.length)gerar();}
 
+
+// ══ EDIÇÃO PÓS-GERAÇÃO ══
+function recalcDia(d){const m=metricasRota(d.vis);d.h=m.hVisita;d.hDesl=m.hDesl;d.km=m.km;}
+function recalcProm(p){p.vis=p.dias.flatMap(d=>d.vis);p.hT=p.dias.reduce((s,d)=>s+d.h,0);p.hDeslT=p.dias.reduce((s,d)=>s+d.hDesl,0);p.kmT=p.dias.reduce((s,d)=>s+d.km,0);const hSem=rData.hSem;p.ocp=Math.round((p.hT+p.hDeslT)/hSem*100);}
+function moverLoja(pi,di,vi){
+  const destino=prompt('Mover para qual promotor? (1 a '+rData.proms.length+')');
+  const pd=rData.proms[parseInt(destino)-1]; if(!pd)return;
+  const po=rData.proms.find(p=>p.id===pi); const v=po.dias[di].vis.splice(vi,1)[0];
+  const diaLeve=pd.dias.reduce((m,d)=>(d.h+d.hDesl)<(m.h+m.hDesl)?d:m);
+  diaLeve.vis.push(v); recalcDia(po.dias[di]); recalcDia(diaLeve);
+  recalcProm(po); recalcProm(pd); renderR(rData);
+}
+function removerVisita(pi,di,vi){
+  const po=rData.proms.find(p=>p.id===pi);
+  po.dias[di].vis.splice(vi,1); recalcDia(po.dias[di]); recalcProm(po); renderR(rData);
+}
+function addPromotor(){
+  const dias=rData.dias;
+  rData.proms.push({id:rData.proms.length,nome:'Promotor '+(rData.proms.length+1),baseNome:'manual',vis:[],hT:0,kmT:0,hDeslT:0,ocp:0,dias:Array.from({length:dias},()=>({vis:[],h:0,hDesl:0,km:0}))});
+  rData.nP=rData.proms.length; renderR(rData);
+}
+function removerPromotor(){
+  const ultimo=rData.proms[rData.proms.length-1];
+  if(ultimo.vis.length){alert('Esvazie o roteiro do '+ultimo.nome+' antes (mova as lojas com ⇄).');return;}
+  rData.proms.pop(); rData.nP=rData.proms.length; renderR(rData);
+}
+
 function renderR(r){
   document.getElementById('rPanel').style.display='';
+  if(!document.getElementById('btnAddProm')){const kp=document.getElementById('kpis');kp.insertAdjacentHTML('beforebegin','<div style=\"margin-bottom:8px\"><button id=\"btnAddProm\" onclick=\"addPromotor()\" style=\"font-size:11px;padding:4px 10px;cursor:pointer\">+ Promotor</button> <button onclick=\"removerPromotor()\" style=\"font-size:11px;padding:4px 10px;cursor:pointer\">− Promotor</button></div>');}
   const totV=stores.reduce((s,l)=>s+l.freq,0);
   document.getElementById('kpis').innerHTML=[['g',r.nP,'Promotores'],['',stores.length,'Lojas'],['',totV,'Visitas/sem'],['gd',r.ocp+'%','Ocupação'],['',r.totH.toFixed(1)+'h','Horas em loja/sem'],['',(r.kmTotal||0).toFixed(0)+' km','Deslocamento/sem']].map(([c,v,l])=>`<div class="kpi"><div class="kpi-val ${c}">${v}</div><div class="kpi-lbl">${l}</div></div>`).join('');
-  document.getElementById('rGrid').innerHTML=r.proms.map(p=>`<div class="prom-card"><div class="prom-hdr"><div class="prom-nome">👤 ${p.nome}</div><div class="prom-ocup">${p.vis.length} vis · ${(p.kmT||0).toFixed(0)} km · ${p.ocp}% ocup.</div></div><div class="prom-body">${p.dias.map((d,di)=>d.vis.length?`<div class="dia-blk"><div class="dia-nome">${DIAS[di]}</div>${d.vis.map((v,vi)=>`<div class="loja-chip"><span class="freq-badge">${v.extra?"⭐ reforço":v.freq+"x/sem"}</span><b>${vi+1}. ${v.nome.split(' ').slice(0,3).join(' ')}</b><br><span class="dist">↔ ${vi>0?kmVia(d.vis[vi-1].lat,d.vis[vi-1].lng,v.lat,v.lng).toFixed(1)+' km':'início'} · ⏱ ${v.tempo}h em loja</span></div>`).join('')}<div class="dia-total">🏪 ${d.h.toFixed(1)}h loja + 🚗 ${(d.hDesl||0).toFixed(1)}h desloc (${(d.km||0).toFixed(0)}km) = <b>${(d.h+(d.hDesl||0)).toFixed(1)}h</b> / ${(r.hSem/r.dias).toFixed(1)}h</div></div>`:'').join('')}</div></div>`).join('');
+  document.getElementById('rGrid').innerHTML=r.proms.map(p=>`<div class="prom-card"><div class="prom-hdr"><div class="prom-nome">👤 ${p.nome}</div><div class="prom-ocup">${p.vis.length} vis · ${(p.kmT||0).toFixed(0)} km · ${p.ocp}% ocup.</div></div><div class="prom-body">${p.dias.map((d,di)=>d.vis.length?`<div class="dia-blk"><div class="dia-nome">${DIAS[di]}</div>${d.vis.map((v,vi)=>`<div class="loja-chip"><span class="freq-badge">${v.extra?"⭐ reforço":v.freq+"x/sem"}</span><b>${vi+1}. ${v.nome.split(' ').slice(0,3).join(' ')}</b> <span style=\"font-weight:400;opacity:.75\">· ${(v.bairro||String(v.endereco||'').split(',')[0]||'').slice(0,22)}</span><br><span class="dist">↔ ${vi>0?kmVia(d.vis[vi-1].lat,d.vis[vi-1].lng,v.lat,v.lng).toFixed(1)+' km':'início'} · ⏱ ${v.tempo}h em loja</span></div>`).join('')}<div class="dia-total">🏪 ${d.h.toFixed(1)}h loja + 🚗 ${(d.hDesl||0).toFixed(1)}h desloc (${(d.km||0).toFixed(0)}km) = <b>${(d.h+(d.hDesl||0)).toFixed(1)}h</b> / ${(r.hSem/r.dias).toFixed(1)}h</div></div>`:'').join('')}</div></div>`).join('');
   document.getElementById('rPanel').scrollIntoView({behavior:'smooth'});
 }
 
