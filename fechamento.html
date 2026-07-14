@@ -183,10 +183,32 @@ function loadData(data){
   if(data.reunioes)renderReun(data.reunioes);
   updKpis();
 }
+// Firebase próprio — lê a compilação mensal gerada pelo agente do servidor (todo dia 9h15)
+const _fbCfg = {apiKey:"AIzaSyCzsxWEMa2qy3_WcV9jVQLR97Iwe2D9A7Q",authDomain:"painel-pdv-quality.firebaseapp.com",projectId:"painel-pdv-quality"};
+const _fbApp = firebase.apps.find(a=>a.name==='fechAuto') || firebase.initializeApp(_fbCfg,'fechAuto');
+const _dbF = firebase.firestore(_fbApp);
+
+async function carregarCompilacaoMensal(mes){
+  try {
+    const snap = await _dbF.doc('painel_comercial/fechamento_auto_'+mes).get();
+    if(!snap.exists) return;
+    const d = snap.data();
+    // Preenche o funil com os dados compilados (editável depois — a edição manual salva por cima)
+    if(d.funil){['fm1','fm2','fm3','fm4','fm5'].forEach((id,i)=>{
+      const el=document.getElementById(id);
+      if(el) el.textContent = d.funil['f'+(i+1)] ?? 0;
+    });}
+    const lbl=document.getElementById('fechSemLabel');
+    if(lbl && d.atualizado_em) lbl.textContent='Sincronizado automaticamente em '+new Date(d.atualizado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    updKpis();
+  } catch(e){ console.warn('compilação mensal:', e.message); }
+}
+
 function onMes(){
   const m=document.getElementById('mesSel').value,p=m.split('-');
   document.getElementById('subLabel').textContent='Resultados de '+MESES[parseInt(p[1])-1]+' '+p[0]+' — Apresentação ao CEO';
   window.parent.postMessage({type:'FECH_LOAD_REQ',mes:m},'*');
+  carregarCompilacaoMensal(m);
 }
 window.addEventListener('message',function(e){
   if(!e.data)return;
