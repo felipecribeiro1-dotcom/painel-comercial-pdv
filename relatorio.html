@@ -830,6 +830,21 @@ function cycleStatus() {
 // automaticamente, sem necessidade de digitar manualmente no relatório.
 async function sincronizarPipelineProspeccao() {
   try {
+    // Fonte primária: doc compilado diariamente pelo agente no servidor (roda às 9h15 mesmo sem ninguém abrir o painel)
+    try {
+      const statsSnap = await db.doc('painel_comercial/prospeccao_stats').get();
+      if (statsSnap.exists) {
+        const s = statsSnap.data();
+        ['f1','f2','f3','f4','f5'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el && el !== document.activeElement) el.value = s[id] || 0;
+        });
+        calcFunil();
+        const lbl = document.getElementById('funilSyncLabel');
+        if (lbl) lbl.textContent = 'Sincronizado ' + new Date(s.atualizado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      }
+    } catch(e) {}
+
     const snap = await db.collection('prospeccao_leads').get();
     if (snap.empty) return;
 
@@ -1140,6 +1155,7 @@ async function fbInit() {
 
     // Sincronização automática do pipeline de prospecção (lê coleção prospeccao_leads)
     sincronizarPipelineProspeccao();
+    setInterval(sincronizarPipelineProspeccao, 5*60*1000);
     setInterval(sincronizarPipelineProspeccao, 5 * 60 * 1000); // atualiza a cada 5 min
 
     // Listeners realtime
