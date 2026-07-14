@@ -340,6 +340,21 @@ async function aprovarLead(id){
   }catch(e){ alert('Erro: '+e.message); }
 }
 
+
+// Banner: status da última captação automática
+(async function statusCaptacao(){
+  try{
+    const s = await db.collection('meta').doc('prospeccao_log').get();
+    if(!s.exists) return;
+    const d = s.data();
+    const div = document.createElement('div');
+    const dt = d.ultima_execucao ? new Date(d.ultima_execucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    div.style.cssText='font-size:11px;padding:6px 18px;background:'+((d.mensagem||'').startsWith('✅')?'#DCFCE7;color:#166534':'#FEF3C7;color:#92400E');
+    div.textContent = `Captação automática ${dt}: ${d.mensagem||''}`;
+    document.body.insertBefore(div, document.body.children[1]);
+  }catch(e){}
+})();
+
 db.collection('prospeccao_leads').orderBy('criado_em','desc').limit(300).onSnapshot(snap=>{
   leadsCache = snap.docs.map(d=>{
     const data = d.data();
