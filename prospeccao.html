@@ -290,6 +290,30 @@ async function agir(acao, id){
   }
 }
 
+
+const DOMINIOS = {
+  'ypê':'ype.com.br','ype':'ype.com.br','predilecta':'predilecta.com.br','mccain':'mccain.com',
+  'reckitt':'reckitt.com','ambev':'ambev.com.br','itambé':'itambe.com.br','itambe':'itambe.com.br',
+  'limppano':'limppano.com.br','italac':'italac.com.br','vigor':'vigor.com.br',
+  'seven boys':'sevenboys.com.br','wickbold':'wickbold.com.br','bem brasil':'bembrasil.com.br',
+  'maguary':'maguary.com.br','matte leão':'mattelao.com.br','red bull':'redbull.com',
+  'seleta':'seleta.com.br','cemil':'cemil.com.br','duracell':'duracell.com',
+  'bombril':'bombril.com.br','frimesa':'frimesa.com.br','leite de rosas':'leitederosas.com.br',
+  'piracanjuba':'piracanjuba.com.br','j.macêdo':'jmacedo.com.br','jmacedo':'jmacedo.com.br',
+  'general mills':'generalmills.com','nestlé':'nestle.com.br','nestle':'nestle.com.br',
+  'lactalis':'lactalis.com.br','riclan':'riclan.com.br','m. dias branco':'mdiasbranco.com.br',
+  'copacol':'copacol.com.br','sanremo':'sanremo.com.br','bettanin':'bettanin.com.br',
+  'haskell':'haskellcosmeticos.com.br','mococa':'mococa.com.br','baly':'baly.com.br',
+  'c.vale':'cvale.com.br'
+};
+function getDominio(empresa){
+  const e = (empresa||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for(const [k,v] of Object.entries(DOMINIOS)){ if(e.includes(k)) return v; }
+  // Tenta gerar domínio a partir do nome
+  const slug = e.replace(/\s*(s\/a|ltda|s\.a|cia|ind|alimentos|brasil|foods|do brasil)\s*/gi,'').trim().replace(/\s+/g,'');
+  return slug ? slug + '.com.br' : null;
+}
+
 let _previewLeadId = null;
 
 function abrirPreview(id) {
@@ -297,7 +321,7 @@ function abrirPreview(id) {
     const l = doc.data();
     _previewLeadId = id;
     document.getElementById('prevNome').textContent = l.nome + ' · ' + l.empresa;
-    document.getElementById('prevPara').textContent = l.email ? ('📧 ' + l.email + (l.email_verificado ? ' ✓ verificado' : '')) : '📧 e-mail será revelado ao confirmar (1 crédito Lusha)';
+    document.getElementById('prevPara').textContent = l.email ? ('📧 ' + l.email + (l.email_verificado ? ' ✓ verificado' : ' ⚠ não verificado')) : '📧 e-mail será descoberto automaticamente ao confirmar';
     document.getElementById('prevAssunto').textContent = l.email_assunto || '';
     document.getElementById('prevCorpo').innerHTML = l.email_corpo || '';
     document.getElementById('previewModal').style.display = '';
@@ -313,22 +337,38 @@ async function aprovarLead(id){
   const doc = await ref.get();
   let lead = doc.data();
   try{
-    // Se o e-mail ainda não foi revelado (captura sem gasto de crédito), revela AGORA — só em lead aprovado
-    if((!lead.email || !lead.email_verificado) && lead.lusha_id){
-      const rr = await fetch('/.netlify/functions/revelar-email', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({lushaId: lead.lusha_id})
-      });
-      const rd = await rr.json().catch(()=>({}));
-      if(rr.ok && rd.email){
-        await ref.update({email: rd.email, email_verificado: true});
-        lead.email = rd.email;
-      } else if(rd.creditos_esgotados){
-        alert('Créditos Lusha esgotados — renova dia 20. Use LinkedIn/WhatsApp nesse lead por enquanto, ou aguarde.');
+    // Verifica/descobre o e-mail se ainda não tiver — usa verificador SMTP próprio (sem custo)
+    if(!lead.email || !lead.email_verificado){
+      const dominio = getDominio(lead.empresa);
+      if(!dominio && !lead.email){
+        alert('Não consegui identificar o domínio da empresa ' + lead.empresa + '. Edite o e-mail manualmente no preview.');
         return;
-      } else if(!lead.email){
-        alert('Não consegui revelar o e-mail: '+(rd.error||'erro')+'. Lead sem e-mail — use o LinkedIn.');
-        return;
+      }
+      if(dominio){
+        try {
+          const rr = await fetch('/.netlify/functions/verificar-email', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({nome: lead.nome, dominio: dominio})
+          });
+          const rd = await rr.json().catch(()=>({}));
+          if(rd.ok && rd.email){
+            await ref.update({email: rd.email, email_verificado: rd.verificado || false, dominio_verificado: dominio});
+            lead.email = rd.email;
+          } else if(!lead.email){
+            // Fallback: padrão nome.sobrenome
+            const partes = lead.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z\s]/g,'').split(/\s+/);
+            const fallback = partes[0] + '.' + partes[partes.length-1] + '@' + dominio;
+            await ref.update({email: fallback, email_verificado: false});
+            lead.email = fallback;
+          }
+        } catch(e) {
+          if(!lead.email){
+            const partes = lead.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z\s]/g,'').split(/\s+/);
+            const fallback = partes[0] + '.' + partes[partes.length-1] + '@' + dominio;
+            await ref.update({email: fallback, email_verificado: false});
+            lead.email = fallback;
+          }
+        }
       }
     }
     const resp = await fetch('/.netlify/functions/send-email', {
